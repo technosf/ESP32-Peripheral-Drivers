@@ -9,7 +9,7 @@ A collection of driver classes for GPIO connected peripherals.
 
 The _DHT22_ is a temperature and humidity sensor that runs off 3V-5V and uses single-wire signaling to initiate and transmit its readings, with one reading being available up to one every two seconds..
 
-This driver uses the ESP32 _RMT_ device to capture the input from the DHT22 and then process the data into five bytes. This data can be read raw, or as temperature (Celsius) and humidity (percent). Looking for prior art for the _RMT_ approach, (jcollie's repo)[https://github.com/jcollie/esp32DHT] provided proof of concept.
+This driver uses the ESP32 _RMT_ device to capture the input from the DHT22 and then process the data into five bytes. This data can be read raw, or as temperature (Celsius) and humidity (percent). Looking for prior art for the _RMT_ approach, [jcollie's repo](https://github.com/jcollie/esp32DHT) provided proof of concept.
 
 
 ## License
