@@ -52,15 +52,24 @@ void DHT22::initialize()
     rmt_config_t rmt_rx;
     rmt_rx.channel = m_channel;
     rmt_rx.gpio_num = m_pin;
-    rmt_rx.clk_div = 80;                            // 1μs (80 Mhz / 80)
+    rmt_rx.clk_div = 80;                  	    // 1μs ticks (80 Mhz clock / 80, typically) so that our intervals work
     rmt_rx.mem_block_num = 1;                       // Use 1 memory block
-    rmt_rx.rmt_mode = RMT_MODE_RX;
+    rmt_rx.rmt_mode = RMT_MODE_RX;                  // Start off in Receive mode
     rmt_rx.rx_config.filter_en = true;              // Filter out pulses below threshold
-    rmt_rx.rx_config.filter_ticks_thresh = 50;      // Ignore pulses shorter than threshold
-    rmt_rx.rx_config.idle_threshold = 500;          // 1 millis
-    ESP_ERROR_CHECK(rmt_config( &rmt_rx ));
+    rmt_rx.rx_config.filter_ticks_thresh = 50;      // Ignore pulses shorter than threshold, 50us
+    rmt_rx.rx_config.idle_threshold = 500;          // 0.5ms
+    ESP_ERROR_CHECK( rmt_config( &rmt_rx ) );
 
     ESP_ERROR_CHECK( rmt_driver_install( m_channel, 512, 0 ) );       // RMT data is cycled into a 512 byte RingBuffer
+
+    // Confirm we are using the APB clock
+    rmt_source_clk_t rmt_source_clk;
+    ESP_ERROR_CHECK( rmt_get_source_clk( m_channel, &rmt_source_clk ) );
+    if ( rmt_source_clk != RMT_BASECLK_APB )
+    {
+        ESP_LOGE( TAG, "::initialize - RMT is not using APB clock. Clock is: %d", rmt_source_clk );
+    }
+
     ESP_ERROR_CHECK( rmt_get_ringbuf_handle( m_channel, &m_ringBuf ) );
 
     ESP_LOGD( TAG, "::initialize - RMT device on pin %d / channel %d initialized.", m_pin, m_channel );
@@ -99,11 +108,11 @@ bool DHT22::update()
     _enquire();    // Read
 
     m_next_read_timestamp = DHT22_REREAD_INTERVAL_MS + esp_log_timestamp();
-    m_status =  _process();
+    m_status = _process();
 
     xSemaphoreGive( m_read_exclusion );
 
-    return (m_status == DHT22_STATUS_OK);
+    return ( m_status == DHT22_STATUS_OK );
 }    // update
 
 
@@ -124,14 +133,14 @@ void DHT22::_enquire()
     ESP_LOGD( TAG, "::_enquire" );
 
     rmt_set_pin( m_channel, RMT_MODE_TX, m_pin );
-    gpio_pulldown_en( m_pin );                      // Pull pin LOW
-    vTaskDelay( DHT22_PULLDOWN_PERIOD );            // for required time to signal the DHT22
-    gpio_pulldown_dis( m_pin );                     // Allow the pin to float so the DHT22 can signal
+    gpio_pulldown_en( m_pin );                          // Pull pin LOW
+    vTaskDelay( DHT22_PULLDOWN_PERIOD_TICKS );             // for required time to signal the DHT22
+    gpio_pulldown_dis( m_pin );                         // Allow the pin to float so the DHT22 can signal
 
-    rmt_set_pin( m_channel, RMT_MODE_RX, m_pin );    // Put the RMT channel into receive mode
-    rmt_rx_start( m_channel, true );                // Start receiving
-    vTaskDelay( DHT22_READ_PERIOD );                 // Wait for the DHT22 to complete signaling
-    rmt_rx_stop( m_channel );                       // Stop receiving
+    rmt_set_pin( m_channel, RMT_MODE_RX, m_pin );       // Put the RMT channel into receive mode
+    rmt_rx_start( m_channel, true );                    // Start receiving
+    vTaskDelay( DHT22_READ_PERIOD_TICKS );                 // Wait for the DHT22 to complete signaling
+    rmt_rx_stop( m_channel );                           // Stop receiving
 }    // _read
 
 
@@ -141,14 +150,14 @@ DHT22::dht22_status_t DHT22::_process()
 
     dht22_status_t status = DHT22_STATUS_UNSET;
     size_t rx_size = 0;
-    void* items = static_cast< rmt_item32_t* >( xRingbufferReceive( m_ringBuf, &rx_size, 100 ) );
+    rmt_item32_t* items = static_cast< rmt_item32_t* >( xRingbufferReceive( m_ringBuf, &rx_size, 100 ) );
 
     if ( items )
     /*
      * Did not timeout, so decode the signals
      */
     {
-        status = _decode( static_cast< rmt_item32_t* >( items ), rx_size / sizeof(rmt_item32_t) );
+        status = _decode( items, rx_size / sizeof(rmt_item32_t) );
         vRingbufferReturnItem( m_ringBuf, items );
 
     }
@@ -177,9 +186,9 @@ DHT22::dht22_status_t DHT22::_decode( rmt_item32_t* data, int number_of_pulses )
 
     ESP_LOGD( TAG, "::_decode - Signal interval: %d", interval );
 
-    if ( interval < DHT22_INTERVAL_MIN || interval > DHT22_INTERVAL_MAX )
+    if ( interval < DHT22_READY_MIN_US || interval > DHT22_READY_MAX_US )
     /*
-     * Should be ~160
+     * Should be ~160 (80us off + 80us on)
      */
     {
         return DHT22_STATUS_NACK;
@@ -196,9 +205,9 @@ DHT22::dht22_status_t DHT22::_decode( rmt_item32_t* data, int number_of_pulses )
         uint8_t bit = i - 1;    // Bit position 0 - 39
         uint8_t byte = bit / 8;    // Data byte 0 - 4
 
-        if ( pulse < DHT22_PULSE_MIN || pulse > DHT22_PULSE_MAX ) return DHT22_STATUS_DATA;    // DATA error
+        if ( pulse < DHT22_PULSE_MIN_US || pulse > DHT22_PULSE_MAX_US ) return DHT22_STATUS_DATA;    // DATA error
 
-        if ( pulse > DHT22_ON_OFF_PULSE_THRESHOLD )
+        if ( pulse > DHT22_ON_OFF_PULSE_THRESHOLD_US )
         /*
          * 1 detected, set corresponding bit in raw value
          */

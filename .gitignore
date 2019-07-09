@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+/sdkconfig
+/build/
+/sdkconfig.old
+/.cproject
+/.project
+/.settings/

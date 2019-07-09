@@ -27,6 +27,7 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
+#include <freertos/portmacro.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 #include <driver/gpio.h>
@@ -36,18 +37,18 @@ namespace epd
 {
 
     /**
-     * \class DHT22
-     * \ingroup epd
+     * @class DHT22
+     * @ingroup epd
      *
-     * \brief Communicates with DHT22 temperature and humidity sensor using the ESP32's RMT interface
+     * @brief Communicates with DHT22 temperature and humidity sensor using the ESP32's RMT interface
      *
      * This driver uses the ESP32 RMT peripheral to capture the DHT22 signaling in the background
      * while it waits to process the checksum and calculate the temperature and humidity.
      *
      * Most of the timing can be modified via the configuration constants.
      *
-     * \author technosf <github.10.technomation@xoxy.net>
-     * \see https://github.com/technosf/ESP32-Peripheral-Drivers
+     * @author technosf <github.10.technomation@xoxy.net>
+     * @see https://github.com/technosf/ESP32-Peripheral-Drivers
      */
     class DHT22
     {
@@ -57,18 +58,18 @@ namespace epd
              * Configuration constants
              *
              */
-            const uint16_t DHT22_REREAD_INTERVAL_MS { 2000 };                   // Interval between the DHT22 can be read
-            const uint8_t DHT22_PULLDOWN_PERIOD { 10 / portTICK_PERIOD_MS };    // DHT22 data line pulldown period to initiate data send
-            const uint8_t DHT22_READ_PERIOD { 10 / portTICK_PERIOD_MS };        // Period required for the DHT22 to send its data
-            const uint8_t DHT22_INTERVAL_MIN { 140 };
-            const uint8_t DHT22_INTERVAL_MAX { 180 };
-            const uint8_t DHT22_PULSE_MIN { 55 };
-            const uint8_t DHT22_PULSE_MAX { 145 };
-            const uint8_t DHT22_ON_OFF_PULSE_THRESHOLD { 110 };                 // Time threshold to descriminate between on/off pulses
+            const uint16_t DHT22_REREAD_INTERVAL_MS { 2000 };                           // Interval between the DHT22 can be read
+            const TickType_t DHT22_PULLDOWN_PERIOD_TICKS { 10 / portTICK_PERIOD_MS };   // 10ms DHT22 data line pulldown period to initiate data send
+            const TickType_t DHT22_READ_PERIOD_TICKS { 10 / portTICK_PERIOD_MS };       // 10ms Period required for the DHT22 to send its data
+            const uint8_t DHT22_READY_MIN_US { 140 };                                   // DHT Ready signal - Should be 160
+            const uint8_t DHT22_READY_MAX_US { 180 };                                   // DHT Ready signal - Should be 160
+            const uint8_t DHT22_PULSE_MIN_US { 70 };                                    // DHT Data Pulse - Should be 76-78 for 0
+            const uint8_t DHT22_PULSE_MAX_US { 150 };                                   // DHT Data Pulse - Should be 120
+            const uint8_t DHT22_ON_OFF_PULSE_THRESHOLD_US { 110 };                      // Time threshold to discriminate between on/off pulses
 
             /**
-             *  \enum dht22_status_t
-             *  \brief Status from reading and processing data from the DHT22
+             *  @enum dht22_status_t
+             *  @brief Status from reading and processing data from the DHT22
              */
             enum dht22_status_t
             {
@@ -85,53 +86,53 @@ namespace epd
         public:
 
             /**
-             * \brief Instantiate new DHT22
-             * \param pin the GPIO pin connected to the DHT22 data line
-             * \param channel the RMT channel to use to capture data
+             * @brief Instantiate new DHT22
+             * @param pin the GPIO pin connected to the DHT22 data line
+             * @param channel the RMT channel to use to capture data
              */
             DHT22( int pin, int channel );
 
             /**
-             * \brief Instantiate new DHT22
-             * \param pin the GPIO pin connected to the DHT22 data line
-             * \param channel the RMT channel to use to capture data
+             * @brief Instantiate new DHT22
+             * @param pin the GPIO pin connected to the DHT22 data line
+             * @param channel the RMT channel to use to capture data
              */
             DHT22( gpio_num_t pin, rmt_channel_t channel );
 
             virtual ~DHT22();
 
             /**
-             * \brief Initialize the peripheral
+             * @brief Initialize the peripheral
              */
             virtual void initialize();
 
             /**
-             * \brief Update the temperature and humidity readings
-             * \return true if the readings were updated
+             * @brief Update the temperature and humidity readings
+             * @return true if the readings were updated
              */
             virtual bool update();
 
             /**
-             * \brief Get the last raw data read from the DHT22
-             * \return the raw data
+             * @brief Get the last raw data read from the DHT22
+             * @return the raw data
              */
             virtual uint8_t * getRaw();
 
             /**
-             * \brief Get the status of the last data read
-             * \return the status
+             * @brief Get the status of the last data read
+             * @return the status
              */
             virtual dht22_status_t getStatus();
 
             /**
-             * \brief Get the temperature in Celsius
-             * \return temperature in degrees Celsius
+             * @brief Get the temperature in Celsius
+             * @return temperature in degrees Celsius
              */
             virtual float getTemperatureCelsius();
 
             /**
-             * \brief Get the temperature in Fahrenheit
-             * \return temperature in degrees Fahrenheit
+             * @brief Get the temperature in Fahrenheit
+             * @return temperature in degrees Fahrenheit
              */
             virtual float getTemperatureFahrenheit()
             {
@@ -139,18 +140,18 @@ namespace epd
             }
 
             /**
-             * \brief Get the percent humidity
-             * \return humidity percent
+             * @brief Get the percent humidity
+             * @return humidity percent
              */
             virtual float getHumidityPercent();
 
             /**
-             * \brief Convert Celsius to Fahrenheit
+             * @brief Convert Celsius to Fahrenheit
              *
              *  (0°C × 9/5) + 32 = 32°F
              *
-             * \param celsius
-             * \return fahrenheit
+             * @param celsius
+             * @return fahrenheit
              */
             static float C2F( float celsius )
             {
@@ -158,16 +159,16 @@ namespace epd
             }
 
             /**
-             * \brief Convert Fahrenheit to Celsius
+             * @brief Convert Fahrenheit to Celsius
              *
              * (32°F − 32) × 5/9 = 0°C
              *
-             * \param fahrenheit
-             * \return celsius
+             * @param fahrenheit
+             * @return celsius
              */
             static float F2C( float fahrenheit )
             {
-                return ( fahrenheit - 32 ) * 0.555555556;
+                return ( fahrenheit - 32 ) * 0.555555555555555555555;
             }
 
         private:
@@ -186,24 +187,24 @@ namespace epd
 
 
             /**
-             * \brief Twiddle the DH22 and read the pin for any DHT22 output
+             * @brief Twiddle the DH22 and read the pin for any DHT22 output
              */
             void _enquire();
 
 
             /**
-             * \brief Process and RMT data read from the DHT22 and stored in the ring buffer
-             * \return the status of the processed data
+             * @brief Process and RMT data read from the DHT22 and stored in the ring buffer
+             * @return the status of the processed data
              */
             dht22_status_t _process();
 
 
             /**
-             * \brief Decode the signals received by RMT and set the status
+             * @brief Decode the signals received by RMT and set the status
              *
-             * \param data the RMT data
-             * \param number_of_pulses the number of pulses collected
-             * \return the status of the decode
+             * @param data the RMT data
+             * @param number_of_pulses the number of pulses collected
+             * @return the status of the decode
              */
             dht22_status_t _decode( rmt_item32_t* data, int number_of_pulses );
 
