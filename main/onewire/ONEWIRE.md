@@ -1,19 +1,12 @@
-# ESP32-Peripheral-Drivers
+# OneWire -  Dallas 1Wire Driver
 ESP32 Peripheral Drivers built with ESP-IDF
 
 A collection of driver classes for GPIO connected peripherals.
 
 ## The Drivers
 
-In-depth Driver documentation is located in the [main](main code directory). The base Dalals 1Wire bus driver is located the [main/onewire](onewire directory under main).
 
-### DHT22
 
-The _DHT22_ is a temperature and humidity sensor that runs off 3V-5V and uses single-wire signaling to initiate and transmit its readings along with a checksum, with a new reading being available up to one every two seconds. 
-
-### DS18S20
-
-The _DS18B20_ is a temperature sensor that runs off 3V-5V and uses the _Dallas 1Wire_ bus for signaling and communication. It has configurable accuracy. 
 
 
 ## License
