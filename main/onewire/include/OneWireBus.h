@@ -97,7 +97,7 @@ namespace epd
                     - OW_WRITE_SLOT_1_LOW_US };    // Minimum = recovery time
 
             /* --------------------------------------------------------------
-             * One Wire Over Drive Timings in Nano Seconds (NS)
+             * One Wire Over Drive Timings in Micro Seconds (US)
              * --------------------------------------------------------------
              */
             static const constexpr float OW_OD_RESET_TIME_US { 70 };
@@ -125,6 +125,19 @@ namespace epd
              */
             const onewire_data_t OW_DATA_ZERO { 0 };
             const onewire_data_t OW_DATA_ONE { 1 };
+
+            /**
+             * @type unmarshal_behavior_t
+             *
+             * How to handle unmarshalling when first pulse is high
+             */
+            enum unmarshal_behavior_t
+            {
+                FAIL,            //!< FAIL
+                DISCARD_HIGH,            //!< DISCARD_HIGH Discard the first high pulse
+                MAKE_ZERO,            //!< MAKE_ZERO Insert a read slot low to make this pulse zero
+                MAKE_ONE            //!< MAKE_ONE Insert a read slot low to make this pulse one
+            };
 
             /**
              * @typedef onewire_search_state_t
@@ -190,8 +203,11 @@ namespace epd
              */
             const virtual char* info() = 0;
 
-            /*
+            /* --------------------------------------------------------
+             *
              * One Wire Network Layer Commands
+             *
+             * --------------------------------------------------------
              */
 
             /**
@@ -251,25 +267,6 @@ namespace epd
              */
             virtual bool skip_rom();
 
-//            /**
-//             * @brief the number of devices found after search/read ROM
-//             * @return the number of devices found
-//             */
-//            uint8_t getDeviceCount();
-//
-//            /**
-//             * @brief Is the given device on the bus?
-//             * @param registration_code device registration code
-//             * @return true if found on bus
-//             */
-//            bool isDevice( uint64_t registration_code );
-//
-//            /**
-//             * @brief Return all the devices found on the bus as an unordered set
-//             * @return the devices
-//             */
-//            const std::unordered_set< uint64_t > getDevices();
-
             /**
              * @brief Issues a 1-Wire ROM Overdrive Match command for one device. Requires reset first.
              *
@@ -286,56 +283,11 @@ namespace epd
              * broadcast data at overdrive speed.
              */
             //  virtual bool overdrive_skip_rom();
-//
-//            /**
-//             * @brief Issues a 1-Wire rom skip command, to address all on bus.
-//             *
-//             * Read one or several consecutive bytes of one or consecutive pages
-//             * starting at any valid address.
-//             */
-//            virtual bool read_memory();
-//
-//
-//            /**
-//             * @brief Issues a 1-Wire rom skip command, to address all on bus.
-//             *
-//             * EPROM devices only: to read the redirection byte followed by an
-//             * inverted CRC16, then read consecutive data bytes starting at any
-//             * valid data address and obtain an inverted CRC16 of the previous data
-//             * bytes at the end of the page; continued reading delivers the same
-//             * sequence of information for the next pages.
-//             */
-//            virtual bool extended_read_memory();
-//
-//
-//            /**
-//             * @brief Issues a 1-Wire rom skip command, to address all on bus.
-//             *
-//             * Read one or several consecutive bytes of one or consecutive pages
-//             * starting at any valid address.
-//             */
-//            virtual bool read_subkey();
-//
-//
-//            /**
-//             * @brief Issues a 1-Wire rom skip command, to address all on bus.
-//             *
-//             * Read one or several consecutive bytes of one or consecutive pages
-//             * starting at any valid address.
-//             */
-//            virtual bool extended_read_memory();
-//
-//
-//
-//            /**
-//             * @brief Issues a 1-Wire rom skip command, to address all on bus.
-//             *
-//             * Read one or several consecutive bytes of one or consecutive pages
-//             * starting at any valid address.
-//             */
-//            virtual bool write_scratchpad();
-            /*
+            /* --------------------------------------------------------
+             *
              * Helper functions
+             *
+             * --------------------------------------------------------
              */
 
             /**
@@ -398,6 +350,13 @@ namespace epd
             virtual bool _bus_reset( onewire_pulses_t& pulses ) = 0;
 
             /**
+             * @brief Put a strong pull up on the bus for the given duration
+             * @param pullup_duration_us pullup duration in us
+             * @return true if transmitted
+             */
+            virtual bool _strong_pullup( uint8_t pullup_duration_us ) = 0;
+
+            /**
              * @brief Write the given bits of data to the bus
              *
              * @param bits the number of bits to write
@@ -456,9 +415,11 @@ namespace epd
              *
              * @param pulses [in] the set of pulses off the wire
              * @param data [in/out] the unmarshalled data
+             * @param behavior [in] Behavior if first pulse is high
              * @return the number of bits that were unmarshalled
              */
-            uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data );
+            uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, unmarshal_behavior_t behavior =
+                    FAIL );
 
         private:
 
@@ -474,5 +435,6 @@ namespace epd
 
     };
 // OneWireBus
+
 }// epd
 #endif /* EPD_ONEWIREBUS_H_ */

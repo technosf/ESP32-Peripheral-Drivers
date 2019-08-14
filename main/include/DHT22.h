@@ -58,14 +58,14 @@ namespace epd
              * Configuration constants
              *
              */
-            const uint16_t DHT22_REREAD_INTERVAL_MS { 2000 };                           // Interval between the DHT22 can be read
-            const TickType_t DHT22_PULLDOWN_PERIOD_TICKS { 10 / portTICK_PERIOD_MS };   // 10ms DHT22 data line pulldown period to initiate data send
-            const TickType_t DHT22_READ_PERIOD_TICKS { 10 / portTICK_PERIOD_MS };       // 10ms Period required for the DHT22 to send its data
-            const uint8_t DHT22_READY_MIN_US { 140 };                                   // DHT Ready signal - Should be 160
-            const uint8_t DHT22_READY_MAX_US { 180 };                                   // DHT Ready signal - Should be 160
-            const uint8_t DHT22_PULSE_MIN_US { 70 };                                    // DHT Data Pulse - Should be 76-78 for 0
-            const uint8_t DHT22_PULSE_MAX_US { 150 };                                   // DHT Data Pulse - Should be 120
-            const uint8_t DHT22_ON_OFF_PULSE_THRESHOLD_US { 110 };                      // Time threshold to discriminate between on/off pulses
+            const uint16_t DHT22_REREAD_INTERVAL_MS { 2000 };                  // Interval between the DHT22 can be read
+            const TickType_t DHT22_PULLDOWN_PERIOD_TICKS { 10 / portTICK_PERIOD_MS };    // 10ms DHT22 data line pulldown period to initiate data send
+            const TickType_t DHT22_READ_PERIOD_TICKS { 10 / portTICK_PERIOD_MS };    // 10ms Period required for the DHT22 to send its data
+            const uint8_t DHT22_READY_MIN_US { 140 };                                // DHT Ready signal - Should be 160
+            const uint8_t DHT22_READY_MAX_US { 180 };                                // DHT Ready signal - Should be 160
+            const uint8_t DHT22_PULSE_MIN_US { 70 };                           // DHT Data Pulse - Should be 76-78 for 0
+            const uint8_t DHT22_PULSE_MAX_US { 150 };                                  // DHT Data Pulse - Should be 120
+            const uint8_t DHT22_ON_OFF_PULSE_THRESHOLD_US { 110 };    // Time threshold to discriminate between on/off pulses
 
             /**
              *  @enum dht22_status_t
@@ -148,7 +148,7 @@ namespace epd
             /**
              * @brief Convert Celsius to Fahrenheit
              *
-             *  (0°C × 9/5) + 32 = 32°F
+             * (0°C × 9/5) + 32 = 32°F
              *
              * @param celsius
              * @return fahrenheit
@@ -173,6 +173,30 @@ namespace epd
 
         private:
 
+            /**
+             * @brief Twiddle the DH22 and read the pin for any DHT22 output
+             */
+            void _enquire();
+
+            /**
+             * @brief Process and RMT data read from the DHT22 and stored in the ring buffer
+             * @return the status of the processed data
+             */
+            dht22_status_t _process();
+
+            /**
+             * @brief Decode the signals received by RMT and set the status
+             *
+             * @param data the RMT data
+             * @param number_of_pulses the number of pulses collected
+             * @return the status of the decode
+             */
+            dht22_status_t _decode( rmt_item32_t* data, int number_of_pulses );
+
+            /*
+             * Members
+             */
+
             gpio_num_t m_pin;
             rmt_channel_t m_channel;
 
@@ -185,31 +209,9 @@ namespace epd
             float m_last_temperature_celcius { 0 };
             float m_last_humidity_percent { 0 };
 
+    };
+// DHT22
 
-            /**
-             * @brief Twiddle the DH22 and read the pin for any DHT22 output
-             */
-            void _enquire();
-
-
-            /**
-             * @brief Process and RMT data read from the DHT22 and stored in the ring buffer
-             * @return the status of the processed data
-             */
-            dht22_status_t _process();
-
-
-            /**
-             * @brief Decode the signals received by RMT and set the status
-             *
-             * @param data the RMT data
-             * @param number_of_pulses the number of pulses collected
-             * @return the status of the decode
-             */
-            dht22_status_t _decode( rmt_item32_t* data, int number_of_pulses );
-
-    }; // DHT22
-
-} // namespace
+}// namespace
 
 #endif /* EPD_DHT22_H_ */

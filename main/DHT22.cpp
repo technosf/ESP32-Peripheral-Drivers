@@ -148,7 +148,7 @@ DHT22::dht22_status_t DHT22::_process()
 {
     ESP_LOGD( TAG, "::_process" );
 
-    dht22_status_t status = DHT22_STATUS_TIMEOUT;
+    dht22_status_t status = DHT22_STATUS_UNSET;
     size_t rx_size = 0;
     rmt_item32_t* items = static_cast< rmt_item32_t* >( xRingbufferReceive( m_ringBuf, &rx_size, 100 ) );
 

@@ -1,7 +1,7 @@
 # Drivers
 ESP32 Peripheral Drivers built with ESP-IDF
 
-A collection of driver classes for GPIO connected peripherals.
+These top-level driver provide high-level functions to operate the peripherals.
 
 ## The Drivers
 
@@ -13,6 +13,9 @@ This driver uses the ESP32 _RMT_ device to capture the input from the DHT22. It 
 
 The processed data status, the  temperature (Celsius) and humidity (percent) can be read from the API, as can the raw 40 bit signal data. Looking for prior art for the _RMT_ approach, [jcollie's repo](https://github.com/jcollie/esp32DHT) provided proof of concept.
 
+### DS18B20
+
+The _DS18B20_ is a temperature sensor that runs off 3V-5V and uses the Dallas 1Wire bus for signaling and communication. It has selectable accuracy, from 9 to 12 bits.
 
 ## License
 

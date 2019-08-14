@@ -28,7 +28,7 @@ using namespace epd;
 bool OneWireBus::bus_reset()
 {
     ESP_LOGD( TAG, "::bus_reset - Start" );
-    if ( xSemaphoreTake( m_aquire_bus_mutex, 0 ) == pdFALSE ) return false;
+    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
 
     m_reset = true;
     m_presence = false;
@@ -68,28 +68,28 @@ bool OneWireBus::bus_reset()
         }
     }
 
-    xSemaphoreGive (m_aquire_bus_mutex);
+    xSemaphoreGive( m_aquire_bus_mutex );
     ESP_LOGD( TAG, "::bus_reset - End. Presence: %d", m_presence );
     return m_presence;
-}    //::bus_reset
+}    // bus_reset
 
 bool OneWireBus::match_rom( uint64_t address, uint8_t func )
 {
     ESP_LOGD( TAG, "::match_rom - Start" );
 
     if ( !m_reset ) return false;
-    if ( xSemaphoreTake( m_aquire_bus_mutex, 0 ) == pdFALSE ) return false;
+    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
 
     m_reset = false;
 
-    onewire_data_t MatchRom = { 0x55 };    //, 0, 0, 0, 0, 0, 0, 0, 0, 0 };    // FIXME
+    onewire_data_t MatchRom = { 0x55 };
     MatchRom.insert( MatchRom.end(), address );
     onewire_data_t data;
 
     _write_slots( MatchRom );
     _read_slots( 1, data );
 
-    xSemaphoreGive (m_aquire_bus_mutex);
+    xSemaphoreGive( m_aquire_bus_mutex );
     ESP_LOGD( TAG, "::match_rom - End" );
     return true;
 }    // match_rom
@@ -99,7 +99,7 @@ bool OneWireBus::read_rom()
     ESP_LOGD( TAG, "::read_rom - Start" );
 
     if ( !m_reset ) return false;
-    if ( xSemaphoreTake( m_aquire_bus_mutex, 0 ) == pdFALSE ) return false;
+    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
 
     static onewire_data_t ReadRom = { 0x33 };
 
@@ -113,16 +113,17 @@ bool OneWireBus::read_rom()
      * 64 bits returned
      */
     {
-        // registerDevice(*(uint64_t*) data.data());
+        // registerDevice(*(uint64_t*) data.data());    // FIXME
     }
     //OneWireDevice d( this, data );
 
 //    ESP_LOGI( TAG, "CRC 0x%02X  ADDR 0x%02X%02X%02X%02X%02X%02X  FAM 0x%02X  V %d", d.crc, d.address [ 0 ],
 //            d.address [ 1 ], d.address [ 2 ], d.address [ 3 ], d.address [ 4 ], d.address [ 5 ], d.family, d.valid );
 
-    // ESP_LOGI(TAG, "RR Adr %d %d %d %d %d %d %d %d",data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7]);
+    ESP_LOGI( TAG, "RR Adr 0x%02X 0x%02X%02X%02X%02X%02X%02X 0x%02X", data [ 0 ], data [ 1 ], data [ 2 ], data [ 3 ],
+            data [ 4 ], data [ 5 ], data [ 6 ], data [ 7 ] );
 
-    xSemaphoreGive (m_aquire_bus_mutex);
+    xSemaphoreGive( m_aquire_bus_mutex );
     ESP_LOGD( TAG, "::read_rom - End" );
     return true;
 }    // read_rom
@@ -132,7 +133,7 @@ bool OneWireBus::search_rom( onewire_search_state_t& search_state )
     ESP_LOGD( TAG, "::search_rom - Start" );
 
     if ( !m_reset ) return false;
-    if ( xSemaphoreTake( m_aquire_bus_mutex, 0 ) == pdFALSE ) return false;
+    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
 
     static onewire_data_t SearchRom = { 0xF0 };
 
@@ -257,7 +258,7 @@ bool OneWireBus::search_rom( onewire_search_state_t& search_state )
         search_state.found = true;
     }
 
-    xSemaphoreGive (m_aquire_bus_mutex);
+    xSemaphoreGive( m_aquire_bus_mutex );
 
     ESP_LOGD( TAG, "::search_rom - End" );
     return true;
@@ -269,7 +270,7 @@ bool OneWireBus::skip_rom()
     ESP_LOGD( TAG, "::skip_rom - Start" );
 
     if ( !m_reset ) return false;
-    if ( xSemaphoreTake( m_aquire_bus_mutex, 0 ) == pdFALSE ) return false;
+    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
 
     m_reset = false;
     onewire_data_t cmd { 0xCC };
@@ -278,61 +279,11 @@ bool OneWireBus::skip_rom()
     _write_slots( cmd );
     // _read_slots( 1, data );
 
-    xSemaphoreGive (m_aquire_bus_mutex);
+    xSemaphoreGive( m_aquire_bus_mutex );
 
     ESP_LOGD( TAG, "::skip_rom - End" );
     return true;
 }    // skip_rom
-
-//uint8_t OneWireBus::getDeviceCount()
-//{
-//    return m_devices.size();
-//}
-//
-//bool OneWireBus::isDevice( uint64_t registration_code )
-//{
-//    return ( m_devices.find( registration_code ) != m_devices.end() );
-//}
-//
-//const std::unordered_set< uint64_t > OneWireBus::getDevices()
-//{
-//    return m_devices;
-//}
-// -----------------------------------------------------------------------------
-
-//bool OneWireBus::overdrive_skip_rom(uint8_t func)
-//{
-//    static uint8_t ODSkipRom = 0x3C;
-//
-//    if ( !m_reset ) return false;
-//    m_reset = false;
-//
-//    uint16_t bits;
-//    uint8_t* data = nullptr;
-//
-//    _write_slot( 8, &ODSkipRom );
-//    _read_slot( data, &bits );
-//    _read_slot( data, &bits );
-//
-//    return true;
-//}
-//
-//bool OneWireBus::overdrive_match_rom()
-//{
-//    static uint8_t ODMatchRom = 0x69;
-//
-//    if ( !m_reset ) return false;
-//    m_reset = false;
-//
-//    uint16_t bits;
-//    uint8_t* data = nullptr;
-//
-//    _write_slot( 8, &ODMatchRom );
-//    _read_slot( data, &bits );
-//    _read_slot( data, &bits );
-//
-//    return true;
-//}
 
 bool OneWireBus::_write_slots( const onewire_data_t& data )
 {
@@ -351,7 +302,8 @@ void OneWireBus::_process_pulse( onewire_pulses_t& pulses, bool level_high, uint
     if ( ( level_high && pulses.back() > 0 )    // High going into a low duration,
     || ( !level_high && pulses.back() < 0 ) )    // Low going into high duration
         /*
-         * Check for change of level, create new pulse if so
+         * Check for change of level, create new pulse if so, otherwise
+         * the timing will accumulate
          */
         pulses.push_back( 0 );    // Add new pulse
 
@@ -371,24 +323,51 @@ void OneWireBus::_process_pulse( onewire_pulses_t& pulses, bool level_high, uint
     }
 }    // _process_pulse
 
-uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data )
+uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, unmarshal_behavior_t behavior )
 {
-    if ( ( pulses.size() % 2 ) == 1 )
-    /*
-     * Odd # of pulses. Err
-     */
-    {
-        ESP_LOGW( TAG, "::_unmarshal_pulses - Odd number of pulses present for unmarshalling." );
-        return 0;
-    }
 
     if ( pulses [ 0 ] < 0 )
     /*
-     * First pulse is line high. Discard as we want an even number of pulses,
-     * with line-low (+ve) followed by line-high (-ve) durations
+     * First pulse is line high.
      */
     {
-        pulses.erase( pulses.begin() );
+        switch ( behavior )
+        {
+            case DISCARD_HIGH:
+                /*
+                 * Discard as we want to start with line-low (+ve) followed by line-high (-ve) durations
+                 */
+                ESP_LOGW( TAG, "::_unmarshal_pulses - Discarding first pulse - High." );
+                pulses.erase( pulses.begin() );
+                break;
+            case MAKE_ZERO:
+                /*
+                 * Insert nominal low vale, meaning the pulse will read as a zero
+                 */
+                ESP_LOGW( TAG, "::_unmarshal_pulses - Augmenting to 0 - first pulse High." );
+                pulses.insert( pulses.begin(), OW_READ_SLOT_LOW_US );
+                break;
+            case MAKE_ONE:
+                /*
+                 * Insert read low vale, meaning the pulse will read as a one
+                 */
+                ESP_LOGW( TAG, "::_unmarshal_pulses - Augmenting to 1 - first pulse High." );
+                pulses.insert( pulses.begin(), OW_READ_DATA_US );
+                break;
+            case FAIL:
+            default:
+                ESP_LOGE( TAG, "::_unmarshal_pulses - Failing on first pulse High." );
+                return 0;
+        }
+    }
+
+    if ( ( pulses.size() % 2 ) == 1 )
+    /*
+     * Odd # of pulses. Note and pad with last pulse being high
+     */
+    {
+        ESP_LOGW( TAG, "::_unmarshal_pulses - Odd number of pulses present for unmarshalling." );
+        pulses.insert( pulses.end(), -9999 );
     }
 
     uint8_t bit { 0 }, byte { 0 };
@@ -408,19 +387,13 @@ uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t
             data.push_back( 0 );
         }
 
-        if ( pulses [ i ] < OW_READ_DATA_US )
+        if ( pulses [ i ] <= OW_READ_DATA_US )
         /*
          * One
          */
         {
             data [ byte ] |= ( 0x01 << bit );    // LSB-MSB bit translation
-
-            // printf( "1" );    // FIXME
         }
-//        else
-//        {
-//            printf( "0" );    // FIXME
-//        }
 
         if ( pulses [ i + 1 ] >= 0    // Check for line low, or no more pulses
         || ( OW_SLOT_TIME_US + OW_RECOVERY_TIME_US ) < ( pulses [ i ] - pulses [ i + 1 ] ) )    // total duration
@@ -462,7 +435,7 @@ bool OneWireBus::scanRegistrationCodes()
 {
     ESP_LOGD( TAG, "::scanRegistrationCodes - Start\n\tBus %s", info() );
 
-    std::vector < uint64_t > registration_codes;
+    std::vector< uint64_t > registration_codes;
     OneWireBus::onewire_search_state_t search_point;
 
     do
@@ -504,15 +477,17 @@ bool OneWireBus::writeAndRead( onewire_data_t& to_wire, uint16_t bits_to_read, o
 {
     ESP_LOGD( TAG, "::writeAndRead - Start" );
 
-    if ( xSemaphoreTake( m_aquire_bus_mutex, 0 ) == pdFALSE ) return false;
+    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
 
     m_reset = false;
 
     _write_slots( to_wire );
     _read_slots( bits_to_read, from_wire );
 
-    xSemaphoreGive (m_aquire_bus_mutex);
+    xSemaphoreGive( m_aquire_bus_mutex );
 
     ESP_LOGD( TAG, "::writeAndRead - End" );
     return true;
-}    // writeAndRead
+}
+// writeAndRead
+

@@ -46,13 +46,13 @@ static rmt_item32_t OWR_WRITE_SLOT_1 =    // RMT Write One Slot Pulse Definition
         RMT_PULSE( OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_WRITE_SLOT_1_LOW_US, 0,
                 OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_WRITE_SLOT_1_HIGH_US, 1 );
 
-OneWireBusRMT::OneWireBusRMT( uint8_t rx_pin, uint8_t rx_channel, uint8_t tx_pin, uint8_t tx_channel ) :
-        OneWireBusRMT( static_cast< gpio_num_t >( rx_pin ), static_cast< rmt_channel_t >( rx_channel ),
-                static_cast< gpio_num_t >( tx_pin ), static_cast< rmt_channel_t >( tx_channel ) )
+OneWireBusRMT::OneWireBusRMT( uint8_t rx_pin, uint8_t tx_pin, uint8_t rx_channel, uint8_t tx_channel ) :
+        OneWireBusRMT( static_cast< gpio_num_t >( rx_pin ), static_cast< gpio_num_t >( tx_pin ),
+                static_cast< rmt_channel_t >( rx_channel ), static_cast< rmt_channel_t >( tx_channel ) )
 {
 }
 
-OneWireBusRMT::OneWireBusRMT( gpio_num_t rx_pin, rmt_channel_t rx_channel, gpio_num_t tx_pin, rmt_channel_t tx_channel )
+OneWireBusRMT::OneWireBusRMT( gpio_num_t rx_pin, gpio_num_t tx_pin, rmt_channel_t rx_channel, rmt_channel_t tx_channel )
 {
     m_rx_pin = rx_pin;
     m_rx_channel = rx_channel;
@@ -74,9 +74,10 @@ OneWireBusRMT::~OneWireBusRMT()
 
 void OneWireBusRMT::initialize()
 {
-    ESP_ERROR_CHECK( gpio_set_direction( m_rx_pin, GPIO_MODE_INPUT ) );         // RX
+    ESP_ERROR_CHECK( gpio_set_direction( m_rx_pin, GPIO_MODE_INPUT_OUTPUT ) );         // RX
+    ESP_ERROR_CHECK( gpio_set_pull_mode( m_rx_pin, GPIO_PULLUP_ONLY ) );         // Pullup only
     ESP_ERROR_CHECK( gpio_set_direction( m_tx_pin, GPIO_MODE_OUTPUT_OD ) );         // TX & Drain
-    ESP_ERROR_CHECK( gpio_set_pull_mode( m_tx_pin, GPIO_PULLDOWN_ONLY ) );         // Drain only
+    ESP_ERROR_CHECK( gpio_set_pull_mode( m_tx_pin, GPIO_PULLUP_ONLY ) );         // Drain only
 
     /* ----------------------------------------------------------------------
      * RX
@@ -151,6 +152,19 @@ bool OneWireBusRMT::_bus_reset( onewire_pulses_t& pulses )
     return true;
 }    // _bus_reset
 
+bool OneWireBusRMT::_strong_pullup( uint8_t pullup_duration_us )
+{
+    ESP_LOGD( TAG, "::_strong_pullup" );
+
+//    rmt_item32_t strong_pullup_pulse = RMT_PULSE( pullup_duration_us, true, OW_RECOVERY_TIME_US, true );
+//
+//    ESP_ERROR_CHECK( rmt_rx_start( m_rx_channel, true ) );                // Start reading - we want the reset pulse too
+//    ESP_ERROR_CHECK( rmt_write_items( m_tx_channel, &strong_pullup_pulse, 1, true ) );    // Reset pulse
+//    _probe (pulses);                                                           // Take the pulses off the wire
+//    rmt_rx_stop( m_rx_channel );    // RX Stop has to be after we read from the wire to work
+    return true;
+}    // _strong_pullup
+
 bool OneWireBusRMT::_write_slots( uint16_t bits, const onewire_data_t& data )
 {
     ESP_LOGV( TAG, "::_write_slots - Start\n\t Writing %d bits, first byte %d", bits, data [ 0 ] );
@@ -213,7 +227,7 @@ bool OneWireBusRMT::_read_slots( uint16_t bits, onewire_data_t& data )
     ESP_ERROR_CHECK( rmt_write_items( m_tx_channel, rmt_items, bits, true ) );
     _probe( pulses );
     ESP_ERROR_CHECK( rmt_rx_stop( m_rx_channel ) );
-    bool result = ( _unmarshal_pulses( pulses, data ) == bits );
+    bool result = ( _unmarshal_pulses( pulses, data, FAIL ) == bits );
 
     ESP_LOG_BUFFER_HEX_LEVEL( TAG, &data, ( bits / 8 ) + 1, ESP_LOG_VERBOSE );
 

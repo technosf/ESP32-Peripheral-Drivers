@@ -72,21 +72,28 @@ namespace epd
 
             /**
              * @brief Constructor using integer values to define RMT channels and pins
+             *
+             * Pins are required, but RMT channels default to 6 and 7.
+             *
              * @param rx_pin the GPIO pin number for RX
-             * @param rx_channel the RMT channel number for RX (should be 0-6)
              * @param tx_pin the GPIO pin number for TX
-             * @param tx_channel the RMT channel number for TX (should be 1-7) and one greater than RX
+             * @param rx_channel the RMT channel number for RX (should be 0-6). Defaults to 6
+             * @param tx_channel the RMT channel number for TX (should be 1-7) and one greater than RX. Defaults to 7
              */
-            OneWireBusRMT( uint8_t rx_pin, uint8_t rx_channel, uint8_t tx_pin, uint8_t tx_channel );
+            OneWireBusRMT( uint8_t rx_pin, uint8_t tx_pin, uint8_t rx_channel = 6, uint8_t tx_channel = 7 );
 
             /**
              * @brief Constructor using RMT & GPIO units
+             *
+             * Pins are required, but RMT channels default to 6 and 7.
+             *
              * @param rx_pin the GPIO pin for RX
-             * @param rx_channel the RMT channel for RX (should be 0-6)
              * @param tx_pin the GPIO pin for TX
-             * @param tx_channel the RMT channel for TX (should be 1-7) and one greater than RX
+             * @param rx_channel the RMT channel for RX (should be 0-6). Defaults to 6
+             * @param tx_channel the RMT channel for TX (should be 1-7) and one greater than RX. Defaults to 7
              */
-            OneWireBusRMT( gpio_num_t rx_pin, rmt_channel_t rx_channel, gpio_num_t tx_pin, rmt_channel_t tx_channel );
+            OneWireBusRMT( gpio_num_t rx_pin, gpio_num_t tx_pin, rmt_channel_t rx_channel = RMT_CHANNEL_6,
+                    rmt_channel_t tx_channel = RMT_CHANNEL_7 );
 
             virtual ~OneWireBusRMT();
 
@@ -110,6 +117,15 @@ namespace epd
              * @see OneWireBus
              */
             bool _bus_reset( onewire_pulses_t& pulses );
+
+            /**
+             * @brief Strong pull-up on the bus
+             *
+             * This is a special case - both tx and rx are put into transmit
+             *
+             * @see OneWireBus
+             */
+            virtual bool _strong_pullup( uint8_t pullup_duration_us );
 
             /**
              * @see OneWireBus
