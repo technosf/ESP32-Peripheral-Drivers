@@ -5,7 +5,7 @@ A collection of driver classes for GPIO connected peripherals.
 
 ## The Drivers
 
-In-depth Driver documentation is located in the [main code directory](main). The base Dalals 1Wire bus driver is located the [onewire directory under main](main/onewire]).
+In-depth Driver documentation is located in the [main code directory](main). The base Dalals 1Wire bus driver is located the [onewire directory under main](main/onewire).
 
 ### DHT22
 
