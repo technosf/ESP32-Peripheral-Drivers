@@ -1,4 +1,4 @@
-# Drivers
+# ESP32 Peripheral Drivers
 ESP32 Peripheral Drivers built with ESP-IDF
 
 This top-level driver collection provide high-level functions to operate the peripherals. If you are using *ESP-IDF* and *cmake*, clone it into the *components* directory of your project.
