@@ -1,19 +1,31 @@
-# ESP32-Peripheral-Drivers
+# Drivers
 ESP32 Peripheral Drivers built with ESP-IDF
 
-A collection of driver classes for GPIO connected peripherals.
+This top-level driver collection provide high-level functions to operate the peripherals. If you are using *ESP-IDF* and *cmake*, clone it into the *components* directory of your project.
+
 
 ## The Drivers
 
-In-depth Driver documentation is located in the [main code directory](main). The base Dalals 1Wire bus driver is located the [onewire directory under main](main/onewire).
+### Released
 
-### DHT22
+#### MAX6675
 
-The _DHT22_ is a temperature and humidity sensor that runs off 3V-5V and uses single-wire signaling to initiate and transmit its readings along with a checksum, with a new reading being available up to one every two seconds. 
+The _MAX6675_ is a SPI temperature sensor interface for K-type thermocouples. It measures from 0°C to 1023°C in 0.25°C increments. This driver can read and return Celsius, Fahrenheit and the raw data produced by the sensor.
 
-### DS18S20
 
-The _DS18B20_ is a temperature sensor that runs off 3V-5V and uses the _Dallas 1Wire_ bus for signaling and communication. It has configurable accuracy. 
+### In Progress
+
+#### DHT22
+
+The _DHT22_ is a temperature and humidity sensor that runs off 3V-5V and uses single-wire signaling to initiate and transmit its readings along with a checksum, with one reading being available up to one every two seconds. 
+
+This driver uses the ESP32 _RMT_ device to capture the input from the DHT22. It uses a single _RMT_ device and one _RMT_ memory block only (i.e. it can use any one RMT device, even #7). By pulling the GPIO low this driver causes the DHT22 to signal a start pulse and following 40 data bits which are captured by the RMT and processed into five bytes. The start pulse is typically low 80µs + high 80µs, while each data bit pulse is low 50-70µs followed by a high of 25-30µs for 0 or a high of 70-80µs for 1. 
+
+The processed data status, the  temperature (Celsius) and humidity (percent) can be read from the API, as can the raw 40 bit signal data. Looking for prior art for the _RMT_ approach, [jcollie's repo](https://github.com/jcollie/esp32DHT) provided proof of concept.
+
+#### DS18B20
+
+The _DS18B20_ is a temperature sensor that runs off 3V-5V and uses the Dallas 1Wire bus for signaling and communication. It has selectable accuracy, from 9 to 12 bits.
 
 
 ## License

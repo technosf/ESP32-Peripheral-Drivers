@@ -28,21 +28,21 @@
 #define MAX6675_CELSIUS_MULT        0.25
 #define MAX6675_FAHRENHEIT_MULT     0.45
 
+
 using namespace epd;
 
 
-
-MAX6675::MAX6675(spi_host_device_t SPI_HOST_DEVICE, int8_t CS, int8_t CLK, int8_t MISO, float resolutionCelsius) :
-    MAX6675( SPI_HOST_DEVICE, static_cast< gpio_num_t >( CS ), static_cast< gpio_num_t >( CLK ), static_cast< gpio_num_t >( MISO ), resolutionCelsius )
+MAX6675::MAX6675(spi_host_device_t SPI_HOST_DEVICE, int8_t CS, int8_t CLK, int8_t MISO) :
+    MAX6675( SPI_HOST_DEVICE, static_cast< gpio_num_t >( CS ), static_cast< gpio_num_t >( CLK ), static_cast< gpio_num_t >( MISO ) )
 {
 }
 
 
-MAX6675::MAX6675(spi_host_device_t SPI_HOST_DEVICE, gpio_num_t CS, gpio_num_t CLK, gpio_num_t MISO, float resolutionCelsius)
+MAX6675::MAX6675(spi_host_device_t SPI_HOST_DEVICE, gpio_num_t CS, gpio_num_t CLK, gpio_num_t MISO)
 {
      m_max6675_data.uint_value = 65535;                 // Initialize MAX6675 raw data with 1s
 
-    ESP_LOGD(TAG, "Constructing SPI Device:%d CS:%d CLK:%d MISO:%d  Resolve %f°C", SPI_HOST_DEVICE, CS, CLK, MISO, resolutionCelsius);
+    ESP_LOGD(TAG, "Constructing SPI for Device:%d CS:%d CLK:%d MISO:%d", SPI_HOST_DEVICE, CS, CLK, MISO);
 
     m_spi_host = SPI_HOST_DEVICE;
     m_devcfg.spics_io_num = CS;
@@ -51,8 +51,8 @@ MAX6675::MAX6675(spi_host_device_t SPI_HOST_DEVICE, gpio_num_t CS, gpio_num_t CL
 }
 
 
-MAX6675::MAX6675(spi_pins_t SPI_PINS, float resolutionCelsius) :
-    MAX6675( SPI_PINS.device, SPI_PINS.cs_pin, SPI_PINS.clk_pin, SPI_PINS.miso_pin, resolutionCelsius )
+MAX6675::MAX6675(spi_pins_t SPI_PINS) :
+    MAX6675( SPI_PINS.device, SPI_PINS.cs_pin, SPI_PINS.clk_pin, SPI_PINS.miso_pin)
 {
 } 
 
@@ -87,7 +87,13 @@ void MAX6675::initialize()
 } // initialize
 
 
-
+/**
+ * Uses a static transaction member that is reset before each read.
+ * The SPI bus is aquired before a polling read and it is realeased
+ * only after the recieved data as been copied to the raw data member.
+ * Data issues and open thermocouple issues are logged but do not
+ * throw errors.
+ */
 void MAX6675:: readSensor()
 {
     static spi_transaction_t transaction;
@@ -116,10 +122,10 @@ void MAX6675:: readSensor()
 
 
     if (m_max6675_data.value.dummy_sign_bit == 1)
-      ESP_LOGE(TAG, "Dummy sign bit is high");
+      ESP_LOGE(TAG, "readSensor - Dummy sign bit is high");
 
     if (m_max6675_data.value.thermocouple_input == 1)
-      ESP_LOGE(TAG, "Thermocouple is not connected\n");
+      ESP_LOGE(TAG, "readSensor - Thermocouple is not connected\n");
 
 } // readSensor
 
@@ -138,7 +144,10 @@ float MAX6675::getCelsius(bool live)
     return (MAX6675_CELSIUS_MULT*m_max6675_data.value.temperature_reading);
 } // getCelsius
 
-
+/**
+ * Read the sensor if live reading required, otherwise return the current reading.
+ * If the thermocouple is open, return -1 as the temperature.
+ */
 float MAX6675::getFahrenheit(bool live)
 {
     if (live) readSensor();

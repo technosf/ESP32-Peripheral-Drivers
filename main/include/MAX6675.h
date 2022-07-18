@@ -52,7 +52,7 @@ namespace epd
      * @details 
      * This driver uses the ESP32 SPI peripheral to request and read the temerature 
      * from a MAX6675 and its connected thermocouple. The MAX6675 has a resolution
-     * of 12 bits, a range of 0°C to 1023°C, with 0.25°C per bit. 
+     * of 12 bits, a range of 0°C to 1023°C, with 0.25°C per step. 
      *
      * This driver allows the resolution to be changed so that certain reading errors
      * (say the thermocouple isn't a K type) can still be compensated for.
@@ -64,12 +64,14 @@ namespace epd
     {
         public:
 
-            static const constexpr char* TAG { "MAX6675" };
+            static const constexpr char* TAG { "MAX6675" };         //!< ESP_LOG Tag 
 
 
             /**
              * @brief Data output format for raw MAX6675 readings
              * 
+             * This data structure mirrors the raw data structure of the MAX6675 but in reverese,
+             * as the MAX6675 is Big Endian, and the ESP32 is Little Endian
              */ 
             struct max6675_raw_t {
                 uint8_t three_state : 1;
@@ -93,38 +95,42 @@ namespace epd
             } ;
 
 
-            static const constexpr spi_pins_t SPI2 {.device = SPI2_HOST, .cs_pin = GPIO_NUM_15, .clk_pin = GPIO_NUM_14, .miso_pin = GPIO_NUM_12}; //!< SPI2 device definition
-            static const constexpr spi_pins_t SPI3 {.device = SPI3_HOST, .cs_pin = GPIO_NUM_5,  .clk_pin = GPIO_NUM_18, .miso_pin = GPIO_NUM_19}; //!< SPI3 device definition
+            static const constexpr spi_pins_t SPI2 {.device = SPI2_HOST, 
+                                                    .cs_pin = GPIO_NUM_15, 
+                                                    .clk_pin = GPIO_NUM_14, 
+                                                    .miso_pin = GPIO_NUM_12}; //!< SPI2 device IOMUX pins definition
+
+            static const constexpr spi_pins_t SPI3 {.device = SPI3_HOST, 
+                                                    .cs_pin = GPIO_NUM_5,  
+                                                    .clk_pin = GPIO_NUM_18, 
+                                                    .miso_pin = GPIO_NUM_19}; //!< SPI3 device IOMUX pins definition
 
             /**
-             * @brief Construct a new MAX6675 object
+             * @brief Construct a new MAX6675 object from pin numbers
+             * 
+             * @param SPI_HOST_DEVICE 
+             * @param CS CS GPIO pin number
+             * @param CLK CLK GPIO pin number
+             * @param MISO MISO GPIO pin number
+             */
+            MAX6675(spi_host_device_t SPI_HOST_DEVICE, int8_t CS, int8_t CLK, int8_t MISO);
+
+            /**
+             * @brief Construct a new MAX6675 object from GPIOs
              * 
              * @param SPI_HOST_DEVICE 
              * @param CS CS GPIO pin
              * @param CLK CLK GPIO pin
              * @param MISO MISO GPIO pin
-             * @param resolutionCelsius reading to celsius resolution
              */
-            MAX6675(spi_host_device_t SPI_HOST_DEVICE, int8_t CS, int8_t CLK, int8_t MISO, float resolutionCelsius = 0.25);
+            MAX6675(spi_host_device_t SPI_HOST_DEVICE, gpio_num_t CS, gpio_num_t CLK, gpio_num_t MISO);
 
             /**
-             * @brief Construct a new MAX6675 object
+             * @brief Construct a new MAX6675 object from SPI pin definition set
              * 
-             * @param SPI_HOST_DEVICE 
-             * @param CS CS GPIO pin
-             * @param CLK CLK GPIO pin
-             * @param MISO MISO GPIO pin
-             * @param resolutionCelsius reading to celsius resolution
+             * @param SPI_PINS GPIO pin set
              */
-            MAX6675(spi_host_device_t SPI_HOST_DEVICE, gpio_num_t CS, gpio_num_t CLK, gpio_num_t MISO, float resolutionCelsius = 0.25);
-
-            /**
-             * @brief Construct a new MAX6675 object
-             * 
-             * @param SPI_PINS 
-             * @param resolutionCelsius reading to celsius resolution
-             */
-            MAX6675(spi_pins_t SPI_PINS, float resolutionCelsius = 0.25);
+            MAX6675(spi_pins_t SPI_PINS);
 
             virtual ~MAX6675();
 
@@ -145,13 +151,15 @@ namespace epd
 
 
             /**
-             * @brief Retruns the last temperature in Celsius
+             * @brief Returns the last temperature in Celsius
              * 
              * Converts the raw temperature value to Celsius.
              * The raw temperature value from the MAX6675 is 12 bits, 
              * from 0-1023°C in 0.25°C increments.
              * 
              * °C =     raw temp/4
+             * 
+             * Valid temp range is 0-1023. If the thermocouple is open -1 is returned.
              * 
              * @param live True, reads live sensor data. False returns the last value read. 
              * @return temperature in degrees Celsius; -1 for an open thermocouple
@@ -163,7 +171,10 @@ namespace epd
              * @brief Returns the last temperature in Fahrenheit
              * 
              * °F = 	(9/5)°C + 32
+             * 
              * °F = 	(9/5)(raw temp/4) + 32
+             * 
+             * Valid temp range is 0-1874. If the thermocouple is open -1 is returned.
              * 
              * @param live True, reads live sensor data. False returns the last value read. 
              * @return temperature in degrees Fahrenheit; -1 for an open thermocouple

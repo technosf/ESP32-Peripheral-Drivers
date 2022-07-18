@@ -6,7 +6,7 @@ This top-level driver collection provide high-level functions to operate the per
 
 ## The Drivers
 
-### Working
+### Released
 
 #### MAX6675
 
