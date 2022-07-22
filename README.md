@@ -25,8 +25,33 @@ The processed data status, the  temperature (Celsius) and humidity (percent) can
 
 #### DS18B20
 
-The _DS18B20_ is a temperature sensor that runs off 3V-5V and uses the Dallas 1Wire bus for signaling and communication. It has selectable accuracy, from 9 to 12 bits.
+The _DS18B20_ is a temperature sensor that uses the Dallas 1Wire bus for signaling and communication, and either runs off a 3V-5V supply or off power from the signaling wire parasistically. It measures from -55°C to +125°C and has selectable accuracy, from 9 to 12 bits. Multiple devices can run off the Dallas 1Wire bus as each is uniquely addressed. Upper and Lower temperature limits can be configured in each _DS18B20_ which if met will set the devices alarm state: A controller on the Dallas 1Wire bus can search the bus for devices with alarm states using an Alarm Search command, and without having to interogate each device on the bus.
 
+
+### Examples
+
+#### MAX6675
+```C++
+    #include <esp_system.h>
+    #include <freertos/FreeRTOS.h>
+    #include <freertos/task.h>
+    #include <math.h>
+
+    #include "MAX6675.h"
+
+    void app_main()
+    {
+        epd::MAX6675* max6675 = new epd::DS18B20(epd::MAX6675::SPI2);
+
+        while (true)
+        {
+            printf("temp R=%u\n",  max6675->getRaw().temperature_reading);
+            printf("temp C=%f\n",  max6675->getCelsius(false));
+            printf("temp F=%f\n",  max6675->getFahrenheit(false));
+            vTaskDelay(20);
+        }
+    }
+```
 
 ## License
 

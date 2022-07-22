@@ -1,11 +1,12 @@
-/*
- * OneWire.h
+/**
+ *  @file       OneWire.h
+ *  @version    0.1.0
  *
- * Driver for Dallas 1-Wire protocol operations
+ *  @brief      Driver for Dallas 1-Wire protocol operations -- core definitions
  *
- *  Created on: Jul 22, 2019
- *      Author: technosf <github.10.technomation@xoxy.net>
- *      See: https://github.com/technosf/ESP32-Peripheral-Drivers
+ *  @date       Jul 22, 2019
+ *  @author     technosf <github.10.technomation@xoxy.net>
+ *  @see        https://github.com/technosf/ESP32-Peripheral-Drivers
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -42,7 +43,7 @@ namespace epd
 {
 
     /**
-     * @class OneWireBus
+     * @class OneWire
      * @ingroup epd
      *
      * @brief Core Dallas 1-Wire bus protocol definition
@@ -54,15 +55,16 @@ namespace epd
         public:
 
             /**
-             * Default constructor
+             * @brief Default constructor
              */
             OneWire();
 
             /**
-             * Constructor with single bus
+             * @brief Constructor with single bus
              * @param bus
              */
             OneWire( OneWireBus* bus );
+
             /**
              *
              */
@@ -71,24 +73,30 @@ namespace epd
             }
 
             /**
-             *
-             * @param bus
-             * @return
+             * @brief Add a OneWire bus to the object
+             * 
+             * @param bus the bus to add
+             * @return True if bus added
              */
             virtual bool addBus( OneWireBus* bus );
 
+
             /**
-             *
-             * @param bus
-             * @return
+             * @brief Remove a OneWire bus from this object
+             * 
+             * @param bus the bus to remove
+             * @return True if bus removed
              */
             virtual bool removeBus( OneWireBus* bus );
 
+
             /**
-             * @brief scan for and identify all devices connected to the busses
-             * @return true if the scan completed without issue
+             * @brief Scan for and identify all devices connected to busses associated with this object
+             * 
+             * @return True if the scan completed without issue
              */
             virtual bool scanDevices();
+
 
             /**
              * @brief Verify that the given device is valid and connected to a bus
@@ -96,7 +104,15 @@ namespace epd
              * @return true if the device was verified attached
              */
             //    virtual bool verifyDevice( OneWireDevice device );
+
         private:
+
+            std::unordered_set< OneWireBus* > m_busses;                         //!<  OneWire Busses
+
+            std::unordered_map< uint64_t, OneWireBus* > m_rom_codes;   //!<  Device registration codes and associated bus
+            
+            // std::unordered_map< uint8_t, OneWireDevice* > m_family_devices;    // Valid devices by Family Code
+            //     std::unordered_map< uint64_t, OneWireDevice* > m_valid_devices;    // Valid devices by Registration Cod
 
             //OneWireDevice find_next_device( OneWireDevice from_device );
 
@@ -125,10 +141,7 @@ namespace epd
              * @return the device if new and valid, or nullptr if not
              */
             //   OneWireDevice* _validate_and_add_new_device( uint64_t registration_code, OneWireBus* bus );
-            std::unordered_set< OneWireBus* > m_busses;    // OneWire Busses
-            std::unordered_map< uint64_t, OneWireBus* > m_registration_codes;    // Device registration codes and their bus
-            // std::unordered_map< uint8_t, OneWireDevice* > m_family_devices;    // Valid devices by Family Code
-            //     std::unordered_map< uint64_t, OneWireDevice* > m_valid_devices;    // Valid devices by Registration Code
+e
 
     };
 // OneWire
