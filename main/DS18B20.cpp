@@ -1,11 +1,12 @@
-/*
- * DS18B20.cpp
+/**
+ *  @file       DS18B20.cpp
+ *  @version    0.1.0
  *
- * Driver for DS18B20 Temperature sensor
+ *  @brief      Driver for DS18B20 Temperature sensor
  *
- *  Created on: Jul 1, 2019
- *      Author: technosf <github.10.technomation@xoxy.net>
- *      See: https://github.com/technosf/ESP32-Peripheral-Drivers
+ *  @date       Jul 1, 2019
+ *  @author     technosf <github.10.technomation@xoxy.net>
+ *  @see        https://github.com/technosf/ESP32-Peripheral-Drivers
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,9 +26,10 @@
 
 using namespace epd;
 
-std::unordered_map< OneWireBus*, DS18B20::PWR_SRC > DS18B20::BUS_POWER;
+// std::unordered_map< OneWireBus*, DS18B20::PWR_SRC > DS18B20::BUS_POWER;
 std::unordered_map< uint64_t, DS18B20* > DS18B20::DEVICE_CODES;
 std::unordered_map< DS18B20*, OneWireBus* > DS18B20::DEVICE_BUSSES;
+
 
 DS18B20::DS18B20( uint64_t reg, OneWireBus* bus ) :
         OneWireDevice( reg )
@@ -47,11 +49,12 @@ DS18B20::~DS18B20()
 {
 }
 
+
 bool DS18B20::identify( OneWireBus* bus )
 {
     ESP_LOGD( TAG, "::identify - Start" );
 
-    for ( auto& code : bus->getRegistrationCodes() )
+    for ( auto& code : bus->getRomCodes() )
     {
         if ( !OneWireDevice::validate( code ) )
         {
@@ -68,7 +71,7 @@ bool DS18B20::identify( OneWireBus* bus )
         {
             DS18B20::DEVICE_CODES.erase( code );
             DS18B20::DEVICE_BUSSES.erase( ds18b20 );
-            DS18B20::DEVICE_POWER.erase( ds18b20 );
+           // DS18B20::DEVICE_POWER.erase( ds18b20 );
         }
         //  OneWireDevice device( code );
 
@@ -80,8 +83,8 @@ bool DS18B20::identify( OneWireBus* bus )
             ds18b20 = new DS18B20( code, bus );
             DS18B20::DEVICE_CODES.emplace( code, ds18b20 );
             DS18B20::DEVICE_BUSSES.emplace( ds18b20, bus );
-            DS18B20::BUS_POWER.emplace( ds18b20, PWR_SRC::UNKNOWN );
-            DS18B20::BUSSES.emplace( bus );
+           // DS18B20::BUS_POWER.emplace( ds18b20, PWR_SRC::UNKNOWN );
+            //DS18B20::BUSSES.emplace( bus );
             ESP_LOGD( TAG, "::identify - Found %s", ds18b20->info() );
         }
     }    // for
@@ -89,6 +92,7 @@ bool DS18B20::identify( OneWireBus* bus )
     ESP_LOGD( TAG, "::identify - End" );
     return true;
 }    // identify
+
 
 std::vector< DS18B20* > DS18B20::getDevices()
 {
@@ -99,6 +103,7 @@ std::vector< DS18B20* > DS18B20::getDevices()
     }
     return devices;
 }    // getDevices
+
 
 std::vector< DS18B20* > DS18B20::getDevices( OneWireBus* bus )
 {
@@ -113,6 +118,7 @@ std::vector< DS18B20* > DS18B20::getDevices( OneWireBus* bus )
     return devices;
 }    // getDevices
 
+
 /* --------------------------------------------------------
  *
  * OneWire DS18B20 Commands
@@ -124,7 +130,7 @@ bool DS18B20::convert_t( OneWireBus* bus )
 {
     ESP_LOGI( TAG, "convert_t: %s", bus->info() );
 
-    onewire_data_t ConvertT = { 0x44 };
+    onewire_data_t ConvertT { 0x44 };
     onewire_data_t data { 0 };
 
     if ( !bus->writeAndRead( ConvertT, 8, data ) ) return false;
@@ -135,10 +141,11 @@ bool DS18B20::convert_t( OneWireBus* bus )
 
 }    // convert_t
 
+
 float DS18B20::read_scratchpad( OneWireBus* bus )
 {
     ESP_LOGD( TAG, "::read_scratchpad - Start" );
-    onewire_data_t ReadScratchpad = { 0xBE };
+    onewire_data_t ReadScratchpad { 0xBE };
     onewire_data_t data { 0 };
 
     if ( !bus->writeAndRead( ReadScratchpad, 16, data ) ) return false;
@@ -149,6 +156,8 @@ float DS18B20::read_scratchpad( OneWireBus* bus )
     return rawtemp / 16.0;    // in 0.0625C increments
 }    // read_scratchpad
 
+
+// TODO
 bool DS18B20::write_scratchpad( OneWireBus* bus )
 {
     ESP_LOGD( TAG, "::write_scratchpad - Start" );
@@ -156,6 +165,8 @@ bool DS18B20::write_scratchpad( OneWireBus* bus )
     return true;    // in 0.0625C increments
 }    // write_scratchpad
 
+
+// TODO
 bool DS18B20::copy_scratchpad( OneWireBus* bus )
 {
     ESP_LOGD( TAG, "::copy_scratchpad - Start" );
@@ -163,6 +174,8 @@ bool DS18B20::copy_scratchpad( OneWireBus* bus )
     return true;    // in 0.0625C increments
 }    // copy_scratchpad
 
+
+// TODO
 bool DS18B20::recall_e2( OneWireBus* bus )
 {
     ESP_LOGD( TAG, "::recall_e2 - Start" );
@@ -170,6 +183,10 @@ bool DS18B20::recall_e2( OneWireBus* bus )
     return true;    // in 0.0625C increments
 }    // recall_e2
 
+
+/*
+ * Start with unknown power state and determine bus or parasitic
+ */
 DS18B20::PWR_SRC DS18B20::read_power_supply( OneWireBus* bus )
 {
     ESP_LOGD( TAG, "::read_power_supply - Start" );

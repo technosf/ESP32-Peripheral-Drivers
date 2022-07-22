@@ -1,11 +1,12 @@
-/*
- * DS18B20.h
+/**
+ *  @file       DS18B20.h
+ *  @version    0.1.0
  *
- * Driver for DS18B20 Temperature sensor
+ *  @brief      Driver for DS18B20 Temperature sensor
  *
- *  Created on: Jul 1, 2019
- *      Author: technosf <github.10.technomation@xoxy.net>
- *      See: https://github.com/technosf/ESP32-Peripheral-Drivers
+ *  @date       Jul 1, 2019
+ *  @author     technosf <github.10.technomation@xoxy.net>
+ *  @see        https://github.com/technosf/ESP32-Peripheral-Drivers
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,8 +53,12 @@ namespace epd
      */
     class DS18B20 : public OneWireDevice
     {
-            static const constexpr char* TAG { "DS18B20" };
+            static const constexpr char* TAG { "DS18B20" };     //!< ESP_LOG Tag 
 
+            /**
+             * @brief OneWire 
+             * 
+             */
             enum class PWR_SRC
             {
                 UNKNOWN, BUS, PARASITIC,
@@ -74,7 +79,7 @@ namespace epd
             /**
              *
              */
-            static const constexpr float TEMP_UNDEFINED { 999.99 };
+            static const constexpr float TEMP_UNDEFINED { 99999.99 };
 
             /**
              * @brief Identify all family devices on the given bus.
@@ -104,7 +109,7 @@ namespace epd
              */
 
             /**
-             * @brief What power source Is this device using parasitic power?
+             * @brief What power source - Is this device using parasitic power?
              * @return true if it is, false if not or unknown.
              */
             PWR_SRC getPowerSource();
@@ -177,18 +182,18 @@ namespace epd
 
         private:
 
-            /*
-             * Busses with identified DS18B20 devices, and if they are know and parasitic
+            /**
+             * @brief Busses with identified DS18B20 devices, and if they are know and parasitic
              */
-            static std::unordered_map< OneWireBus*, PWR_SRC > BUS_POWER;
+          //  static std::unordered_map< OneWireBus*, PWR_SRC > BUS_POWER;
 
-            /*
-             * DS18B20 Reg codes and their devices
+            /**
+             * @brief DS18B20 Reg codes and their devices
              */
             static std::unordered_map< uint64_t, DS18B20* > DEVICE_CODES;
 
-            /*
-             * DS18B20 reg codes and their busses
+            /**
+             * @brief DS18B20 reg codes and their busses
              */
             static std::unordered_map< DS18B20*, OneWireBus* > DEVICE_BUSSES;
 

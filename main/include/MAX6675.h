@@ -237,7 +237,7 @@ namespace epd
              * @brief Read the MAX6675 sensor and populate m_max6675_data
              * 
              */
-            void readSensor();
+            void _readSensor();
 
     }; // MAX6675
 
