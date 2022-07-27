@@ -105,7 +105,7 @@ bool OneWireBus::match_rom( uint64_t address, uint8_t func )
 }    // match_rom
 
 
-bool OneWireBus::read_rom(std::vector< uint64_t >& romcode)
+bool OneWireBus::read_rom(onewire_rom_code_t& romcode)
 {
     ESP_LOGD( TAG, "::read_rom - Start" );
 
@@ -120,14 +120,9 @@ bool OneWireBus::read_rom(std::vector< uint64_t >& romcode)
     _write_slots( ReadRom );
     _read_slots( 64, data );
 
-    if ( data.size() == 8 )
-    /*
-     * 64 bits returned
-     */
-    {
-        romcode[0] = *(uint64_t*) data.data();
-        // registerDevice(*(uint64_t*) data.data());    // FIXME
-    }
+    if ( data.size() == 8 )     // 64 bits returned
+        romcode = (*(onewire_rom_code_t*) data.data());
+    
     //OneWireDevice d( this, data );
 
 //    ESP_LOGV( TAG, "CRC 0x%02X  ADDR 0x%02X%02X%02X%02X%02X%02X  FAM 0x%02X  V %d", d.crc, d.address [ 0 ],
@@ -506,7 +501,7 @@ bool OneWireBus::readRomCode()
     
     ESP_LOGD( TAG, "::readRomCode - Start\n\tBus %s", info() );
 
-    std::vector< uint64_t > rom_codes;
+    onewire_rom_code_t rom_code;
 
     if ( !bus_reset() )
     /*
@@ -517,18 +512,20 @@ bool OneWireBus::readRomCode()
         return false;
     }
 
-    bool result = read_rom(rom_codes);
+    bool result = read_rom(rom_code);
 
     if (result)
     {
-        m_rom_codes.swap( rom_codes );
-        ESP_LOGD( TAG, "::readRomCode - found %lld", rom_codes.front() );
+        m_rom_codes.clear();
+        m_rom_codes.push_back( rom_code );
+        ESP_LOGD( TAG, "::readRomCode - found %lld", rom_code );
     }
 
     ESP_LOGD( TAG, "::readRomCode - End");
 
     return result;
 }    // readRomCode
+
 
 const std::vector< uint64_t >& OneWireBus::getRomCodes()
 {

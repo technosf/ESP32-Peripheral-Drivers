@@ -131,6 +131,15 @@ namespace epd
     using onewire_data_t = std::vector<uint8_t>;
 
     /**
+     * @typedef onewire_rom_code_t
+     * @ingroup epd
+     * 
+     * @brief ROM COde datatype
+     * 
+     */
+    using onewire_rom_code_t = uint64_t;
+    
+    /**
      * @class OneWireBus
      * @ingroup epd
      *
@@ -319,7 +328,7 @@ namespace epd
              * @param [in/out] the found romcode
              * @return true if command issued
              */
-            virtual bool read_rom(std::vector< uint64_t >& romcode);
+            virtual bool read_rom( onewire_rom_code_t& romcode);
 
 
             /**
@@ -571,7 +580,7 @@ namespace epd
             uint16_t m_adaptive_fastest_read { 0 };  // From Tpdh, the fastest device, min time needed for read-slot
             uint16_t m_adaptive_slowest_write { 0 };  // (Tpdh+Tpdl)/5 -  the slowest device
 
-            std::vector< uint64_t > m_rom_codes;
+            std::vector< onewire_rom_code_t > m_rom_codes;
 
     };
 // OneWireBus
