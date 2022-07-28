@@ -31,6 +31,8 @@
 #include <string.h>
 #include <array>
 
+#include "OneWireBus.h"
+
 namespace epd
 {
 
@@ -72,7 +74,6 @@ namespace epd
             /**
              * @brief Constructor generates and validates the device registration code
              *
-             * @param bus the OneWireBus that the device was discovered on
              * @param reg raw registration data from the device
              */
             OneWireDevice( uint64_t reg );
@@ -86,7 +87,6 @@ namespace epd
             {
             }
 
-
             /**
              * @brief Information about this device
              */
@@ -94,11 +94,11 @@ namespace epd
 
 
             /**
-             * @brief Returns the registration code
+             * @brief Returns the device ROM code
              * 
-             * @return  registration code
+             * @return  rom code
              */
-            uint64_t getRegistrationCode();
+            onewire_rom_code_t getRomCode();
 
 
             /**
@@ -110,11 +110,11 @@ namespace epd
 
 
             /**
-             * @brief The device address
+             * @brief The device serial numberess
              * 
-             * @return Six byte device address
+             * @return Six byte serial number
              */
-            std::array< uint8_t, 6 > getAddress();
+            uint64_t getSerialNumber();
 
 
             /**
@@ -125,29 +125,51 @@ namespace epd
             uint8_t getFamily();
 
             /**
-             * @brief Returns the given byte of the registration code
-             * 
-             * @param byte 0-7 for the 8 bytes
-             * @return the byte
-             */
-            uint8_t getByte( uint8_t byte );
-
-            /**
-             * @brief Indicates if the reg code for this device is valid
+             * @brief Indicates if the ROM code for this device is valid
              * 
              * @return true if valid
              */
             bool isValid();
 
 
+            /**
+             * @brief Is this device is attached to a bus, or the given OneWireBus
+             * 
+             * If no bus is supplied, will return the current state. If a bus is
+             * supplied the device bus , that bus will be interogated, and will be set as the 
+             * device bus if found to contain this device.
+             * 
+             * 
+             * @param bus the specific OneWireBus to check
+             * @param clearBus if true will clear the device current bus info before interogation
+             * @return epd::OneWireBus* the bus device is attached to, or nullptr if not attached
+             */
+            epd::OneWireBus* isBusAttached(epd::OneWireBus* bus = nullptr, bool clearBus = false );
+
+
+            /**
+             * @brief Is this device using parasitic power
+             * 
+             * Enquires on the bus if not known
+             * 
+             * @return true 
+             * @return false 
+             */
+            bool isParasitic();
+
+        protected:
+
+            OneWireBus* m_one_wire_bus { nullptr };         //!< OneWireBus the device is attached to, if known
+
         private:
 
-            uint64_t m_registration_code;                   //!< Device reg code
+            onewire_rom_code_t m_rom_code;                  //!< Device ROM code
             uint8_t m_crc;                                  //!< Device CRC
-            std::array< uint8_t, 6 > m_address;             //!< Device address
+            uint64_t m_serial_number {0};                   //!< Device serial number
             uint8_t m_family;                               //!< Device family
             bool m_valid { false };                         //!< Device valid flag
             std::string m_info;                             //!< Device info
+            PWR_SRC m_power_supply { PWR_SRC::UNKNOWN };    //!< Device power supply
     };
 // OneWireDevice
 

@@ -61,17 +61,6 @@ namespace epd
 
         public:
 
-            /*
-             * Configuration constants
-             *
-             */
-            static const uint8_t OWR_CLK_FREQ_MHZ { 80 };                               //!< Base clock frequency to calculate ticks. APB default of 80Mhz
-            static const uint8_t OWR_CLK_PWR { 3 };                                     //!< 8ths to allow enough granularity (sub 1us) for OverDrive
-            static const uint8_t OWR_CLK_DIV { OWR_CLK_FREQ_MHZ >> OWR_CLK_PWR };       //!< This divider will produce ticks of 100ns
-            static const uint8_t OWR_TICKS_PER_US { OWR_CLK_FREQ_MHZ / OWR_CLK_DIV };   //!< 8 ticks per micro second at expected defaults
-            static const uint16_t OWR_RX_IDLE_THRESHOLD_US { 1000 };                    //!< 1ms dead time wait before terminating RMT RX
-
-
             /**
              * @brief Constructor using integer values to define RMT channels and pins
              *

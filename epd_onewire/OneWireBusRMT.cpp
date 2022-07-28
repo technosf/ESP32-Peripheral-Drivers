@@ -24,6 +24,18 @@
 
 #include "OneWireBusRMT.h"
 
+
+/*
+    RMT Timing Definition
+*/
+#define OWR_CLOCK                   RMT_BASECLK_APB
+#define OWR_CLK_FREQ_MHZ            80                                  //!< Base clock frequency to calculate ticks. APB default of 80Mhz
+#define OWR_CLK_PWR                 3                                   //!< 8ths to allow enough granularity (sub 1us) for OverDrive
+#define OWR_CLK_DIV                 ( OWR_CLK_FREQ_MHZ >> OWR_CLK_PWR ) //!< This divider will produce ticks of 100ns
+#define OWR_TICKS_PER_US            ( OWR_CLK_FREQ_MHZ / OWR_CLK_DIV )  //!< 8 ticks per micro second at expected defaults
+#define OWR_RX_IDLE_THRESHOLD_US    1000                                //!< 1ms dead time wait before terminating RMT RX
+
+
 using namespace epd;
 
 // -- Helper forward declarations
@@ -36,20 +48,20 @@ static void U8_TO_RMT( const void* src, rmt_item32_t* dest, size_t src_size, siz
 // -- 
 
 static rmt_item32_t OWR_RESET =    //!< RMT Reset Pulse Definition
-        RMT_PULSE( OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_RESET_TIME_US, 0, 0, 1 );
+        RMT_PULSE( OWR_TICKS_PER_US * OW_RESET_TIME_US, 0, 0, 1 );
 
 static rmt_item32_t OWR_READ_SLOT =    //!< RMT Read Slot Pulse Definition
-        RMT_PULSE( OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_READ_SLOT_LOW_US, 0,
-                OneWireBusRMT::OWR_TICKS_PER_US * ( OneWireBus::OW_SLOT_TIME_US - OneWireBus::OW_READ_SLOT_LOW_US ),
+        RMT_PULSE( OWR_TICKS_PER_US * OW_READ_SLOT_LOW_US, 0,
+                OWR_TICKS_PER_US * ( OW_SLOT_TIME_US - OW_READ_SLOT_LOW_US ),
                 1 );
 
 static rmt_item32_t OWR_WRITE_SLOT_0 =    //!< RMT Write Zero Slot Pulse Definition
-        RMT_PULSE( OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_WRITE_SLOT_0_LOW_US, 0,
-                OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_WRITE_SLOT_0_HIGH_US, 1 );
+        RMT_PULSE( OWR_TICKS_PER_US * OW_WRITE_SLOT_0_LOW_US, 0,
+                OWR_TICKS_PER_US * OW_WRITE_SLOT_0_HIGH_US, 1 );
 
 static rmt_item32_t OWR_WRITE_SLOT_1 =    //!< RMT Write One Slot Pulse Definition
-        RMT_PULSE( OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_WRITE_SLOT_1_LOW_US, 0,
-                OneWireBusRMT::OWR_TICKS_PER_US * OneWireBus::OW_WRITE_SLOT_1_HIGH_US, 1 );
+        RMT_PULSE( OWR_TICKS_PER_US * OW_WRITE_SLOT_1_LOW_US, 0,
+                OWR_TICKS_PER_US * OW_WRITE_SLOT_1_HIGH_US, 1 );
 
 
 // -- Constructors
@@ -94,16 +106,18 @@ void OneWireBusRMT::initialize()
      * ----------------------------------------------------------------------
      */
     rmt_config_t rmt_rx;
+    rmt_rx.rmt_mode = RMT_MODE_RX;                              // Start off in Receive mode
     rmt_rx.channel = m_rx_channel;
     rmt_rx.gpio_num = m_rx_pin;
     rmt_rx.clk_div = OWR_CLK_DIV;                               // Set interval time
     rmt_rx.mem_block_num = 2;                                   // Use 1 memory block
-    rmt_rx.rmt_mode = RMT_MODE_RX;                              // Start off in Receive mode
+    rmt_rx.flags = 0;
     rmt_rx.rx_config.filter_en = true;                          // Filter out pulses below threshold
     rmt_rx.rx_config.filter_ticks_thresh = 2 + OWR_CLK_PWR;     // Ignore pulses shorter than threshold
     rmt_rx.rx_config.idle_threshold = OWR_RX_IDLE_THRESHOLD_US * OWR_TICKS_PER_US;
+    
     ESP_ERROR_CHECK( rmt_config( &rmt_rx ) );
-
+    ESP_ERROR_CHECK( rmt_set_source_clk(m_rx_channel, OWR_CLOCK) ); // 80 Mhz.
     ESP_ERROR_CHECK( rmt_driver_install( m_rx_channel, 1023, 0 ) );     // RMT data is cycled into a RingBuffer
 
     /*
@@ -128,15 +142,18 @@ void OneWireBusRMT::initialize()
     rmt_tx.gpio_num = m_tx_pin;
     rmt_tx.clk_div = OWR_CLK_DIV;                   // Set interval time
     rmt_tx.mem_block_num = 1;                       // Use 1 memory block
-    rmt_tx.tx_config.loop_en = false;
-    rmt_tx.tx_config.carrier_en = false;
+    rmt_tx.flags = 0;
+    rmt_tx.tx_config.carrier_freq_hz = 0; 
+    rmt_tx.tx_config.carrier_level = RMT_CARRIER_LEVEL_LOW;
     rmt_tx.tx_config.idle_level = RMT_IDLE_LEVEL_HIGH;
+    rmt_tx.tx_config.carrier_duty_percent = 0;
+    rmt_tx.tx_config.carrier_en = false;
+    rmt_tx.tx_config.loop_en = false;
     rmt_tx.tx_config.idle_output_en = true;
 
 
-
     ESP_ERROR_CHECK( rmt_config( &rmt_tx ) );
-
+    ESP_ERROR_CHECK( rmt_set_source_clk(m_tx_channel, OWR_CLOCK) ); // 80 Mhz.
     ESP_ERROR_CHECK( rmt_driver_install( m_tx_channel, 0, 0 ) );        // RMT data is cycled into a 512 byte RingBuffer
     ESP_ERROR_CHECK( rmt_translator_init( m_tx_channel, U8_TO_RMT ) );  // Set full-byte translator
 
@@ -206,14 +223,7 @@ bool OneWireBusRMT::_write_slots( uint16_t bits, const onewire_data_t& data )
         rmt_item32_t* rmt_items = (rmt_item32_t*) malloc( boundarybits * sizeof(rmt_item32_t) );
         for ( uint8_t i = 0; i < boundarybits; i++ )
         {
-            if ( data [ wholebytes ] & ( 0x01 << i ) )
-            {
-                rmt_items [ i ].val = OWR_WRITE_SLOT_1.val;
-            }
-            else
-            {
-                rmt_items [ i ].val = OWR_WRITE_SLOT_0.val;
-            }
+            rmt_items [ i ].val = ( data [ wholebytes ] & ( 0x01 << i ) ) ? OWR_WRITE_SLOT_1.val : OWR_WRITE_SLOT_0.val;
         }
         ESP_ERROR_CHECK( rmt_write_items( m_tx_channel, rmt_items, boundarybits, true ) );
         free( rmt_items );
@@ -363,15 +373,7 @@ static void U8_TO_RMT( const void* src, rmt_item32_t* dest, size_t src_size, siz
          * Process each bit in the current byte
          */
         {
-            if ( *psrc & ( 0x1 << i ) )
-            {
-                pdest->val = OWR_WRITE_SLOT_1.val;
-            }
-            else
-            {
-                pdest->val = OWR_WRITE_SLOT_0.val;
-            }
-
+            pdest->val =   ( *psrc & ( 0x1 << i ) ) ? OWR_WRITE_SLOT_1.val : OWR_WRITE_SLOT_0.val;
             num++;
             pdest++;
         }    // for

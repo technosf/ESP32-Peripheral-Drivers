@@ -25,75 +25,62 @@
 #ifndef EPD_ONEWIREBUS_H_
 #define EPD_ONEWIREBUS_H_
 
+
 /* One Wire Over-Drive Timings in Micro Seconds (US) */
 /* Timings from https://pdfserv.maximintegrated.com/en/an/AN126.pdf */
 
-/*
-#define OW_TIMING Safe
+#undef OW_OVERDRIVE 
 
-#if OW_TIMING == 1 
+#ifndef OW_OVERDRIVE
+    #pragma message "OWR Standard timings used."
+// --------------------------------------------------------------
+// One Wire Standard Timings in Micro Seconds (US)
+//  --------------------------------------------------------------
 
-#warning "Standard OW Timings"
-    #define OW_RESET_TIME_US  480
-    #define OW_SLOT_TIME_US  70 
-    #define OW_RECOVERY_TIME_US  1 
+    #define OW_RESET_TIME_US                    480 
+    #define OW_SLOT_TIME_US                     80
+    #define OW_RECOVERY_TIME_US                 1
 
-    #define OW_PRESENCE_PULSE_HIGH_MIN_US  15 
-    #define OW_PRESENCE_PULSE_HIGH_MAX_US  60 
-    #define OW_PRESENCE_PULSE_LOW_MIN_US  60 
-    #define OW_PRESENCE_PULSE_LOW_MAX_US  240 
-    #define OW_READ_SLOT_LOW_US  2 
-    #define OW_READ_DATA_US  12 
+    #define OW_PRESENCE_PULSE_HIGH_MIN_US       15
+    #define OW_PRESENCE_PULSE_HIGH_MAX_US       60
+    #define OW_PRESENCE_PULSE_LOW_MIN_US        60
+    #define OW_PRESENCE_PULSE_LOW_MAX_US        240
 
-    #define OW_WRITE_SLOT_0_LOW_US  74 
-    #define OW_WRITE_SLOT_0_HIGH_US  OW_RECOVERY_TIME_US + OW_SLOT_TIME_US - OW_WRITE_SLOT_0_LOW_US     //!< Minimum = recovery time
+    #define OW_READ_SLOT_LOW_US                 2
+    #define OW_READ_DATA_US                     12
 
-    #define OW_WRITE_SLOT_1_LOW_US  7 
-    #define OW_WRITE_SLOT_1_HIGH_US  OW_RECOVERY_TIME_US + OW_SLOT_TIME_US - OW_WRITE_SLOT_1_LOW_US     //!< Minimum = recovery time
-
-
-#elif OW_TIMING == "Overdrive"
-
-#warning "Overdrive OW Timings"
-    #define OW_RESET_TIME_US  70 
-    #define OW_SLOT_TIME_US  15 
-    #define OW_RECOVERY_TIME_US  1 
-
-    #define OW_PRESENCE_PULSE_HIGH_MIN_US  2 
-    #define OW_PRESENCE_PULSE_HIGH_MAX_US  6 
-    #define OW_PRESENCE_PULSE_LOW_MIN_US  8 
-    #define OW_PRESENCE_PULSE_LOW_MAX_US  24 
-
-    #define OW_READ_SLOT_LOW_US  1.25 
-    #define OW_READ_DATA_US  12 
-
-    #define OW_WRITE_SLOT_0_LOW_US  14 
-    #define OW_WRITE_SLOT_1_LOW_US  1.5 
-
-#else                   
-  Safe timings    
-
-#warning "Safe OW Timings"
-    #define OW_RESET_TIME_US  650
-    #define OW_SLOT_TIME_US  80 
-    #define OW_RECOVERY_TIME_US  1 
-
-    #define OW_PRESENCE_PULSE_HIGH_MIN_US  15 
-    #define OW_PRESENCE_PULSE_HIGH_MAX_US  60 
-    #define OW_PRESENCE_PULSE_LOW_MIN_US  60 
-    #define OW_PRESENCE_PULSE_LOW_MAX_US  240 
-
-    #define OW_READ_SLOT_LOW_US  2 
-    #define OW_READ_DATA_US  12 
-
-    #define OW_WRITE_SLOT_0_LOW_US  74 
-    #define OW_WRITE_SLOT_1_LOW_US  7 
-
+    #define OW_WRITE_SLOT_0_LOW_US              74
+    #define OW_WRITE_SLOT_1_LOW_US              7
 #endif
 
-#define OW_WRITE_SLOT_0_HIGH_US OW_RECOVERY_TIME_US + OW_SLOT_TIME_US - OW_WRITE_SLOT_0_LOW_US     
-#define OW_WRITE_SLOT_1_HIGH_US OW_RECOVERY_TIME_US + OW_SLOT_TIME_US - OW_WRITE_SLOT_1_LOW_US 
-*/
+
+#ifdef OW_OVERDRIVE
+    #pragma message "OWR Over-Drive timings used."
+// --------------------------------------------------------------
+// One Wire Over-Drive Timings in Micro Seconds (US)
+//  --------------------------------------------------------------
+
+    #define OW_RESET_TIME_US                    70 
+    #define OW_SLOT_TIME_US                     15
+    #define OW_RECOVERY_TIME_US                 1
+
+    #define OW_PRESENCE_PULSE_HIGH_MIN_US       2
+    #define OW_PRESENCE_PULSE_HIGH_MAX_US       6
+    #define OW_PRESENCE_PULSE_LOW_MIN_US        8
+    #define OW_PRESENCE_PULSE_LOW_MAX_US        24
+
+    #define OW_READ_SLOT_LOW_US                 1.25
+    #define OW_READ_DATA_US                     12
+
+    #define OW_WRITE_SLOT_0_LOW_US              14
+    #define OW_WRITE_SLOT_1_LOW_US              1.5
+#endif
+
+
+#define OW_SLOT_RECOVERY_US                 ( OW_RECOVERY_TIME_US + OW_SLOT_TIME_US )
+#define OW_WRITE_SLOT_0_HIGH_US             ( OW_SLOT_RECOVERY_US - OW_WRITE_SLOT_0_LOW_US )    //!< Minimum = recovery time
+#define OW_WRITE_SLOT_1_HIGH_US             ( OW_SLOT_RECOVERY_US - OW_WRITE_SLOT_1_LOW_US )    //!< Minimum = recovery time
+
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -105,6 +92,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include <vector>
+
 
 namespace epd
 {
@@ -138,6 +126,17 @@ namespace epd
      * 
      */
     using onewire_rom_code_t = uint64_t;
+
+    /**
+     * @brief OneWireBus power source
+     * 
+     */
+    enum class PWR_SRC
+    {
+        UNKNOWN, 
+        BUS, 
+        PARASITIC,
+    };
     
     /**
      * @class OneWireBus
@@ -152,53 +151,8 @@ namespace epd
 
         public:
 
-            /* --------------------------------------------------------------
-             * One Wire Standard Timings in Microseconds (US)
-             * --------------------------------------------------------------
-             */
-            static const constexpr float OW_RESET_TIME_US { 480 };
-            static const constexpr float OW_SLOT_TIME_US { 80 };
-            static const constexpr float OW_RECOVERY_TIME_US { 1 };
-            static const constexpr float OW_SLOT_RECOVERY_US { OW_RECOVERY_TIME_US + OW_SLOT_TIME_US };
-
-            static const constexpr float OW_PRESENCE_PULSE_HIGH_MIN_US { 15 };
-            static const constexpr float OW_PRESENCE_PULSE_HIGH_MAX_US { 60 };
-            static const constexpr float OW_PRESENCE_PULSE_LOW_MIN_US { 60 };
-            static const constexpr float OW_PRESENCE_PULSE_LOW_MAX_US { 240 };
-
-            static const constexpr float OW_READ_SLOT_LOW_US { 2 };
-            static const constexpr float OW_READ_DATA_US { 12 };
-
-            static const constexpr float OW_WRITE_SLOT_0_LOW_US { 74 };
-            static const constexpr float OW_WRITE_SLOT_0_HIGH_US { OW_SLOT_RECOVERY_US - OW_WRITE_SLOT_0_LOW_US };    //!< Minimum = recovery time
-
-            static const constexpr float OW_WRITE_SLOT_1_LOW_US { 7 };
-            static const constexpr float OW_WRITE_SLOT_1_HIGH_US { OW_SLOT_RECOVERY_US - OW_WRITE_SLOT_1_LOW_US };    //!< Minimum = recovery time
 
 
-            /* --------------------------------------------------------------
-             * One Wire Over-Drive Timings in Micro Seconds (US)
-             * --------------------------------------------------------------
-             */
-            static const constexpr float OW_OD_RESET_TIME_US { 70 };
-            static const constexpr float OW_OD_SLOT_TIME_US { 15 };
-            static const constexpr float OW_OD_RECOVERY_TIME_US { 1 };
-
-            static const constexpr float OW_OD_PRESENCE_PULSE_HIGH_MIN_US { 2 };
-            static const constexpr float OW_OD_PRESENCE_PULSE_HIGH_MAX_US { 6 };
-            static const constexpr float OW_OD_PRESENCE_PULSE_LOW_MIN_US { 8 };
-            static const constexpr float OW_OD_PRESENCE_PULSE_LOW_MAX_US { 24 };
-
-            static const constexpr float OW_OD_READ_SLOT_LOW_US { 1.25 };
-            static const constexpr float OW_OD_READ_DATA_US { 12 };
-
-            static const constexpr float OW_OD_WRITE_SLOT_0_LOW_US { 14 };
-            static const constexpr float OW_OD_WRITE_SLOT_0_HIGH_US { OW_OD_RECOVERY_TIME_US + OW_OD_SLOT_TIME_US
-                    - OW_OD_WRITE_SLOT_0_LOW_US };    //!< Minimum = recovery time
-
-            static const constexpr float OW_OD_WRITE_SLOT_1_LOW_US { 1.5 };
-            static const constexpr float OW_OD_WRITE_SLOT_1_HIGH_US { OW_OD_RECOVERY_TIME_US + OW_OD_SLOT_TIME_US
-                    - OW_OD_WRITE_SLOT_1_LOW_US };    //!< Minimum = recovery time
 
             /*
              * Constant Values
@@ -220,7 +174,8 @@ namespace epd
             };
 
             /**
-             * @typedef onewire_search_state_t
+             * @struct onewire_search_state_t
+             * 
              * @brief Structure that encapsulates Search ROM state
              */
             struct onewire_search_state_t
@@ -236,6 +191,8 @@ namespace epd
                     }
 
                     /**
+                     * @struct onewire_search_state_t
+                     * 
                      * @brief Primes state to search from a given registration code
                      * 
                      * @param registration_code
@@ -325,7 +282,7 @@ namespace epd
              *
              * Identify a device or determine if several devices are connected in parallel.
              *
-             * @param [in/out] the found romcode
+             * @param romcode the found romcode
              * @return true if command issued
              */
             virtual bool read_rom( onewire_rom_code_t& romcode);
@@ -338,7 +295,7 @@ namespace epd
              * search state initial and ending status. Searches from the given state
              * and returns when a device, or no more devices are found.
              *
-             * @param [in/out] search_state the state to search and returning state
+             * @param search_state the state to search and returning state
              * @return true if the command was issued
              */
             virtual bool search_rom( onewire_search_state_t& search_state );
@@ -466,11 +423,30 @@ namespace epd
              * 
              * @param to_wire data to be written to the bus
              * @param bits_to_read read slots to read and unmarshal
-             * @param from_wire data unmarshalled from the bus
+             * @param[out] from_wire data unmarshalled from the bus
              * @return true if data written
              */
             virtual bool writeAndRead( onewire_data_t& to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
 
+            /**
+             * @brief Has the bus been scanned for all attached devices
+             * 
+             * @return true bus has been successfully scanned
+             * @return false bus has not been successfully scanned
+             */
+            virtual bool isScanned();
+
+            /**
+             * @brief Get the bus Status
+             * 
+             * The bus status is one of:
+             *  - Reset (where it is ready for a ROM command)
+             *  - Addressed (where devices have been addressed and are ready for a function command)
+             *  - Unknown (where the state is unknow or a function command has been issued)
+             * 
+             * @return STATUS the current status
+             */
+            //virtual STATUS getStatus();
 
         protected:
 
@@ -485,7 +461,7 @@ namespace epd
              * (OW_RESET_TIME_US, or zero if the master is not captured). If the
              * master is captured, the adaptive timing is calculated.
              *
-             * @param pulses [in/out] the pulse durations off the wire
+             * @param pulses the pulse durations off the wire
              * @return true if the reset was sent
              */
             virtual bool _bus_reset( onewire_pulses_t& pulses ) = 0;
@@ -546,7 +522,7 @@ namespace epd
              * This helper takes a raw pulse and encodes and incorporates it into the set of pulses.
              * It aggregates consecutive pulses with the same line level.
              *
-             * @param pulses [in/out] the set of pulses being generated
+             * @param pulses the set of pulses being generated
              * @param level_high true if pulse line high, or false for pulse line low
              * @param duration the duration in us of the pulse
              */
@@ -561,9 +537,9 @@ namespace epd
              * Expect even number of pulses and alternating line levels.
              * Starts on first low pulse.
              *
-             * @param pulses [in] the set of pulses off the wire
-             * @param data [in/out] the unmarshalled data
-             * @param behavior [in] Behavior if first pulse is high
+             * @param pulses the set of pulses off the wire
+             * @param data the unmarshalled data
+             * @param behavior Behavior if first pulse is high
              * @return the number of bits that were unmarshalled
              */
             uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, unmarshal_behavior_t behavior =
@@ -581,6 +557,34 @@ namespace epd
             uint16_t m_adaptive_slowest_write { 0 };  // (Tpdh+Tpdl)/5 -  the slowest device
 
             std::vector< onewire_rom_code_t > m_rom_codes;
+
+            //const SemaphoreHandle_t m_aquire_bus_mutex { xSemaphoreCreateRecursiveMutex() };    //!< Coordinate commandeering the bus
+
+            /**
+             * @brief Check bus is reset/autoreset and guard the bus
+             * 
+             * @param autoreset reset the bus if not reset
+             * @param xBlockTime time to wait for the guard
+             * @return true if bus is guarded and in reset state
+             * @return false if the bus is not guarded and reset
+             */
+            //inline bool _bus_guard_ready( bool autoreset, TickType_t xBlockTime = portMAX_DELAY );
+
+            /**
+             * @brief Attempt to guard the bus
+             * 
+             * @param xBlockTime time to wait for the guard
+             * @return true if the bus is guarder
+             * @return false if the bus guard failed
+             */
+            //inline bool _bus_guard( TickType_t xBlockTime = portMAX_DELAY );
+
+            /**
+             * @brief Release the bus guard and set the bus state
+             * 
+             * @param busreset sets the bus state
+             */
+            //inline void _bus_release( STATUS state = STATUS::UNKNOWN );
 
     };
 // OneWireBus

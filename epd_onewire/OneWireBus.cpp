@@ -22,6 +22,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 #include "OneWireBus.h"
 
 using namespace epd;
@@ -122,13 +123,15 @@ bool OneWireBus::read_rom(onewire_rom_code_t& romcode)
 
     if ( data.size() == 8 )     // 64 bits returned
         romcode = (*(onewire_rom_code_t*) data.data());
+
+    //bool valid = OneWireDevice::validate( romcode );    
     
     //OneWireDevice d( this, data );
 
 //    ESP_LOGV( TAG, "CRC 0x%02X  ADDR 0x%02X%02X%02X%02X%02X%02X  FAM 0x%02X  V %d", d.crc, d.address [ 0 ],
 //            d.address [ 1 ], d.address [ 2 ], d.address [ 3 ], d.address [ 4 ], d.address [ 5 ], d.family, d.valid );
 
-    ESP_LOGI( TAG, "RR Adr 0x%02X 0x%02X%02X%02X%02X%02X%02X 0x%02X", data [ 0 ], data [ 1 ], data [ 2 ], data [ 3 ],
+    ESP_LOGI( TAG, "ROM Code: 0x%02X 0x%02X%02X%02X%02X%02X%02X 0x%02X", data [ 0 ], data [ 1 ], data [ 2 ], data [ 3 ],
             data [ 4 ], data [ 5 ], data [ 6 ], data [ 7 ] );
 
     xSemaphoreGive( m_aquire_bus_mutex );
@@ -269,6 +272,8 @@ bool OneWireBus::search_rom( onewire_search_state_t& search_state )
         if ( search_state.LastDiscrepancy == 0 ) search_state.LastDeviceFlag = true;
         search_state.found = true;
     }
+
+    m_scanned = true;
 
     xSemaphoreGive( m_aquire_bus_mutex );
 
@@ -551,3 +556,13 @@ bool OneWireBus::writeAndRead( onewire_data_t& to_wire, uint16_t bits_to_read, o
     return true;
 } // writeAndRead
 
+bool OneWireBus::isScanned()
+{
+    return m_scanned;
+} // isScanned 
+
+
+// epd::STATUS OneWireBus::getStatus()
+// {
+//     return m_status;
+// }

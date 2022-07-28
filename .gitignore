@@ -59,3 +59,4 @@ build
 apidoc/warnings.txt
 apidoc/html/
 .vscode
+partitions.csv

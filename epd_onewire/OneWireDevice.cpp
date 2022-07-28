@@ -79,73 +79,104 @@ uint8_t OneWireDevice::family( uint64_t reg )
 }    // family
 
 
-OneWireDevice::OneWireDevice( uint64_t reg )
+OneWireDevice::OneWireDevice( onewire_rom_code_t rom_code ) :
+m_rom_code { rom_code }
 {
     ESP_LOGD( TAG, "::OneWireDevice - New device" );
 
-    m_registration_code = reg;
-    uint8_t* regbytes = (uint8_t*) &reg;
+    uint8_t* regbytes = (uint8_t*) &rom_code;
 
     m_family = regbytes [ 0 ];
-    memcpy( m_address.data(), &regbytes [ 1 ], 6 );
     m_crc = regbytes [ 7 ];
 
-    m_valid = OneWireDevice::validate( reg );    // Do the device and calculated CRCs match
+    memcpy( &m_serial_number, regbytes+1, 6 );
+
+    m_valid = OneWireDevice::validate( rom_code );    // Do the device and calculated CRCs match
 
     char info [ 72 ] { ' ' };
-    sprintf( info, "Family:0x%02X  Address:0x%02X%02X%02X%02X%02X%02X  CRC:0x%02X  %s", m_family, regbytes [ 1 ],
+    sprintf( info, "Family:0x%02X  Serial:0x%02X%02X%02X%02X%02X%02X  CRC:0x%02X  %s", m_family, regbytes [ 1 ],
             regbytes [ 2 ], regbytes [ 3 ], regbytes [ 4 ], regbytes [ 5 ], regbytes [ 6 ], m_crc,
             ( m_valid ? "Valid" : "Invalid" ) );
+    m_info.assign(info);
+    ESP_LOGD( TAG, "::OneWireDevice - Set info: %s", info );
+} // OneWireDevice
 
-    //ESP_LOGD( TAG, "::OneWireDevice - Set info: %s", info );
-    m_info = std::string( info );
-    ESP_LOGD( TAG, "::OneWireDevice - Set info: %s", m_info.c_str() );
-}
 
+/* --------------------------------------------------------
+*
+* Device information
+*
+* --------------------------------------------------------
+*/
 
 const char* OneWireDevice::info()
 {
     return m_info.c_str();
-}
+} // info
 
 
-uint64_t OneWireDevice::getRegistrationCode()
+onewire_rom_code_t OneWireDevice::getRomCode()
 {
-    return m_registration_code;
-}
+    return m_rom_code;
+} // getRomCode
 
 
 uint8_t OneWireDevice::getCrc()
 {
     return m_crc;
-}
+} // getCrc
 
 
-std::array< uint8_t, 6 > OneWireDevice::getAddress()
+uint64_t OneWireDevice::getSerialNumber()
 {
-    return m_address;
-}
+    return m_serial_number;
+} // getSerialNumber
 
 
 uint8_t OneWireDevice::getFamily()
 {
     return m_family;
-}
-
-
-uint8_t OneWireDevice::getByte( uint8_t byte )
-{
-    if ( byte > 7 )
-    {
-        ESP_LOGE( TAG, "::getByte -  Out of Bounds, index: %0x02X", byte );
-        return 0;
-    }
-    return ( (uint8_t*) &m_registration_code ) [ byte ];
-}
+} // getFamily
 
 
 bool OneWireDevice::isValid()
 {
     return m_valid;
+} // isValid
+
+
+epd::OneWireBus* OneWireDevice::isBusAttached(epd::OneWireBus* bus, bool clearBus)
+{
+    if ( !bus ) return m_one_wire_bus;
+
+    if ( !bus->isScanned() || !bus->searchRomCodes() ) 
+    // Bus not scanned, or requested to be cl
+        return nullptr;
+    
+    if ( clearBus ) m_one_wire_bus = nullptr;
+
+    std::vector<onewire_rom_code_t>::iterator it;
+    if( std::find(bus->getRomCodes().begin(), bus->getRomCodes().end(), m_rom_code) != bus->getRomCodes().end() )
+    // Device found on given bus
+        m_one_wire_bus = bus;  
+
+    // TODO skip rom parasitic
+        
+    return m_one_wire_bus;
+} // isBusAttached
+
+
+bool OneWireDevice::isParasitic()
+{
+    return ( m_power_supply == PWR_SRC::PARASITIC );
 }
+
+
+
+/* --------------------------------------------------------
+*
+* One Wire Network Layer common Device Commands
+*
+* --------------------------------------------------------
+*/
 
