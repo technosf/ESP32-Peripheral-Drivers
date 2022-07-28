@@ -131,11 +131,22 @@ namespace epd
      * @brief OneWireBus power source
      * 
      */
-    enum class PWR_SRC
+    enum PWR_SRC
     {
         UNKNOWN, 
         BUS, 
         PARASITIC,
+    };
+    /**
+     * @brief OneWireBus power source
+     * 
+     */
+    enum ADAPTIVE_TIMING
+    {
+        NONE, 
+        READ, 
+        WRITE,
+        READ_WRITE,
     };
     
     /**
@@ -393,6 +404,14 @@ namespace epd
              */
             virtual uint16_t getAdaptiveSlowestWrite(); // TODO
 
+            /**
+             * @brief Inspect or set adaptive timing use
+             * 
+             * @param use true if setting timing, false if inquiry
+             * @param timing the timing to set if setting
+             * @return ADAPTIVE_TIMING the current timing
+             */
+            virtual ADAPTIVE_TIMING useAdaptive( bool setadaptive = false, ADAPTIVE_TIMING timing = NONE );
 
             /**
              * @brief Search the bus for any attached devices and collates their ROM codes.
@@ -545,16 +564,23 @@ namespace epd
             uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, unmarshal_behavior_t behavior =
                     FAIL );
 
+            /**
+             * @brief Implement the adaptive timing
+             * 
+             * @param timing the timings to adapt
+             */
+            virtual void _set_adaptive_timing( ADAPTIVE_TIMING timing ) = 0;
 
         private:
 
             const SemaphoreHandle_t m_aquire_bus_mutex { xSemaphoreCreateMutex() };    // Coordinate commandeering the bus
 
-            bool m_presence { false };      // Presence pulse seen
-            bool m_scanned { false };       // Bus has been scanned for devices and devices are known
-            bool m_reset { false };         // Bus is in reset state
-            uint16_t m_adaptive_fastest_read { 0 };  // From Tpdh, the fastest device, min time needed for read-slot
-            uint16_t m_adaptive_slowest_write { 0 };  // (Tpdh+Tpdl)/5 -  the slowest device
+            bool m_presence { false };                      // Presence pulse seen
+            bool m_scanned { false };                       // Bus has been scanned for devices and devices are known
+            bool m_reset { false };                         // Bus is in reset state
+            uint16_t m_adaptive_fastest_read { 0 };         // From Tpdh, the fastest device, min time needed for read-slot
+            uint16_t m_adaptive_slowest_write { 0 };        // (Tpdh+Tpdl)/5 -  the slowest device
+            ADAPTIVE_TIMING m_adaptive_timing { NONE };     //
 
             std::vector< onewire_rom_code_t > m_rom_codes;
 
@@ -590,4 +616,5 @@ namespace epd
 // OneWireBus
 
 }// epd
+
 #endif /* EPD_ONEWIREBUS_H_ */

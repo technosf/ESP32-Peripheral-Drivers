@@ -60,7 +60,10 @@ bool OneWireBus::bus_reset()
          */
         {
             m_presence = true;
-            if ( pulse_offset )
+            if ( pulse_offset 
+            &&  ( m_adaptive_fastest_read != -pulses [ 1 ] ) 
+            &&  ( m_adaptive_slowest_write != ( ( m_adaptive_fastest_read + pulses [ 2 ] ) / 5 ) )
+            )
             /*
              * Master reset signal found, along with a presence pulses
              * so we can calculate adaptive timing
@@ -68,7 +71,7 @@ bool OneWireBus::bus_reset()
             {
                 m_adaptive_fastest_read = -pulses [ 1 ];  // Tpdh (Pin is high, so represented as a -ve value in pulses)
                 m_adaptive_slowest_write = ( m_adaptive_fastest_read + pulses [ 2 ] ) / 5;
-
+                if ( NONE != m_adaptive_timing )_set_adaptive_timing( m_adaptive_timing );
                 ESP_LOGD( TAG, "::bus_reset - Adaptive timing fastest-read/Tpdh: %u, Tpdl: %u  slowest write: %u", m_adaptive_fastest_read, pulses [ 2 ], m_adaptive_slowest_write );
             }
         }
@@ -461,6 +464,17 @@ uint16_t OneWireBus::getAdaptiveSlowestWrite()
     return m_adaptive_slowest_write;
 }    // getAdaptiveSlowestWrite
 
+
+ADAPTIVE_TIMING OneWireBus::useAdaptive( bool setadaptive, ADAPTIVE_TIMING timing )
+{
+    if ( setadaptive )
+    {
+        m_adaptive_timing = timing;
+        _set_adaptive_timing( timing );
+    }
+
+    return m_adaptive_timing;
+}
 
 bool OneWireBus::searchRomCodes()
 {

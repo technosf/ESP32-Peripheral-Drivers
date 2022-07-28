@@ -141,6 +141,10 @@ namespace epd
              */
             bool _read_slots( uint16_t bits, onewire_data_t& data );
 
+            /**
+             * @see OneWireBus
+             */
+            virtual void _set_adaptive_timing( ADAPTIVE_TIMING timing );
 
             /* --------------------------------------------------------------
              * Implementation Specifics

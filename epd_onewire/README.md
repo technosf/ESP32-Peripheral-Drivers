@@ -64,7 +64,10 @@ void main()
 }
 ```
 
+## Debugging
 
+Using [PulseView], a sample frequency of 4MHz works well for reading line-level pulses.
+[PulseView]: https://sigrok.org/wiki/PulseView
 
 ## License
 

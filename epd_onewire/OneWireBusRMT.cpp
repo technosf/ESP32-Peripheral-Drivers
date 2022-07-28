@@ -200,7 +200,7 @@ bool OneWireBusRMT::_strong_pullup( uint8_t pullup_duration_us )
 
 bool OneWireBusRMT::_write_slots( uint16_t bits, const onewire_data_t& data )
 {
-    ESP_LOGV( TAG, "::_write_slots - Start\n\t Writing %d bits, first byte %d", bits, data [ 0 ] );
+    ESP_LOGV( TAG, "::_write_slots - Start\n\t Writing %d bits, first byte %02X", bits, data [ 0 ] );
 
     uint8_t wholebytes = bits / 8;
     uint8_t boundarybits = bits % 8;
@@ -229,7 +229,6 @@ bool OneWireBusRMT::_write_slots( uint16_t bits, const onewire_data_t& data )
         free( rmt_items );
     }
 
-    // probe();
     ESP_LOGV( TAG, "::_write_slots - End" );
     return true;
 }    // _write_slots
@@ -302,6 +301,21 @@ size_t OneWireBusRMT::_probe( onewire_pulses_t& pulses )
 
     return index;
 }    // _probe
+
+void OneWireBusRMT::_set_adaptive_timing( ADAPTIVE_TIMING timing )  // TODO implement
+{
+    switch ( timing )
+    {
+        case READ: 
+            break;
+        case WRITE: 
+            break;
+        case READ_WRITE: 
+            break;
+        default :               // NONE
+            break;
+    }
+}
 
 
 /* ---------------------------------------------------
