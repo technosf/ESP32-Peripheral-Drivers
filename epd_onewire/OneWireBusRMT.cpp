@@ -236,6 +236,8 @@ bool OneWireBusRMT::_write_slots( uint16_t bits, const onewire_data_t& data )
 
 bool OneWireBusRMT::_read_slots( uint16_t bits, onewire_data_t& data )
 {
+    if ( !bits ) return true;
+    
     ESP_LOGV( TAG, "::_read_slots - Start\n\tReading %d bits", bits );
 
     rmt_item32_t* rmt_items = (rmt_item32_t*) malloc( bits * sizeof(rmt_item32_t) );
@@ -259,6 +261,7 @@ bool OneWireBusRMT::_read_slots( uint16_t bits, onewire_data_t& data )
     ESP_LOG_BUFFER_HEX_LEVEL( TAG, &data, ( bits / 8 ) + 1, ESP_LOG_VERBOSE );
 
     free( rmt_items );
+    
     ESP_LOGV( TAG, "::_read_slots - End" );
     return result;
 }    // _read_slots

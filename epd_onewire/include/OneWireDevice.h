@@ -169,7 +169,7 @@ namespace epd
             uint8_t m_family;                               //!< Device family
             bool m_valid { false };                         //!< Device valid flag
             std::string m_info;                             //!< Device info
-            PWR_SRC m_power_supply { PWR_SRC::UNKNOWN };    //!< Device power supply
+            PWR_SRC m_power_supply { PWR_SRC::BUS };    //!< Device power supply
     };
 // OneWireDevice
 

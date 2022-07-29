@@ -133,7 +133,6 @@ namespace epd
      */
     enum PWR_SRC
     {
-        UNKNOWN, 
         BUS, 
         PARASITIC,
     };
@@ -149,6 +148,17 @@ namespace epd
         READ_WRITE,
     };
     
+    /**
+     * @brief OneWireBus status
+     * 
+     */
+    enum STATUS
+    {
+        UNKNOWN, 
+        RESET, 
+        ADDRESSED,
+    };
+
     /**
      * @class OneWireBus
      * @ingroup epd
@@ -285,7 +295,7 @@ namespace epd
              *
              * @return true if command sent
              */
-            virtual bool match_rom( uint64_t registration_code, uint8_t func );
+            virtual bool match_rom( uint64_t registration_code, bool autoreset = true );
 
 
             /**
@@ -296,7 +306,7 @@ namespace epd
              * @param romcode the found romcode
              * @return true if command issued
              */
-            virtual bool read_rom( onewire_rom_code_t& romcode);
+            virtual bool read_rom( onewire_rom_code_t& romcode, bool autoreset = true );
 
 
             /**
@@ -309,7 +319,7 @@ namespace epd
              * @param search_state the state to search and returning state
              * @return true if the command was issued
              */
-            virtual bool search_rom( onewire_search_state_t& search_state );
+            virtual bool search_rom( onewire_search_state_t& search_state, bool autoreset = true );
 
 
             /**
@@ -321,7 +331,7 @@ namespace epd
              * application usually requires all iButtons to be of the same type and to
              * be connected properly.
              */
-            virtual bool skip_rom();
+            virtual bool skip_rom( bool autoreset = true );
 
 
             /**
@@ -446,6 +456,9 @@ namespace epd
              * @return true if data written
              */
             virtual bool writeAndRead( onewire_data_t& to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
+            virtual bool writeAndRead( uint8_t to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
+            virtual bool write( uint8_t to_wire );
+
 
             /**
              * @brief Has the bus been scanned for all attached devices
@@ -465,7 +478,7 @@ namespace epd
              * 
              * @return STATUS the current status
              */
-            //virtual STATUS getStatus();
+             STATUS getStatus();
 
         protected:
 
@@ -571,20 +584,19 @@ namespace epd
              */
             virtual void _set_adaptive_timing( ADAPTIVE_TIMING timing ) = 0;
 
+
         private:
 
-            const SemaphoreHandle_t m_aquire_bus_mutex { xSemaphoreCreateMutex() };    // Coordinate commandeering the bus
+            const SemaphoreHandle_t m_aquire_bus_mutex { xSemaphoreCreateRecursiveMutex() };    // Coordinate commandeering the bus
 
             bool m_presence { false };                      // Presence pulse seen
             bool m_scanned { false };                       // Bus has been scanned for devices and devices are known
-            bool m_reset { false };                         // Bus is in reset state
+            STATUS m_status { STATUS::UNKNOWN };            //!< Bus status
             uint16_t m_adaptive_fastest_read { 0 };         // From Tpdh, the fastest device, min time needed for read-slot
             uint16_t m_adaptive_slowest_write { 0 };        // (Tpdh+Tpdl)/5 -  the slowest device
             ADAPTIVE_TIMING m_adaptive_timing { NONE };     //
 
             std::vector< onewire_rom_code_t > m_rom_codes;
-
-            //const SemaphoreHandle_t m_aquire_bus_mutex { xSemaphoreCreateRecursiveMutex() };    //!< Coordinate commandeering the bus
 
             /**
              * @brief Check bus is reset/autoreset and guard the bus
@@ -594,7 +606,7 @@ namespace epd
              * @return true if bus is guarded and in reset state
              * @return false if the bus is not guarded and reset
              */
-            //inline bool _bus_guard_ready( bool autoreset, TickType_t xBlockTime = portMAX_DELAY );
+            inline bool _bus_guard_and_reset( bool autoreset = true, TickType_t xBlockTime = portMAX_DELAY );
 
             /**
              * @brief Attempt to guard the bus
@@ -603,17 +615,16 @@ namespace epd
              * @return true if the bus is guarder
              * @return false if the bus guard failed
              */
-            //inline bool _bus_guard( TickType_t xBlockTime = portMAX_DELAY );
+            inline bool _bus_guard( TickType_t xBlockTime = portMAX_DELAY );
 
             /**
              * @brief Release the bus guard and set the bus state
              * 
              * @param busreset sets the bus state
              */
-            //inline void _bus_release( STATUS state = STATUS::UNKNOWN );
+            inline void _bus_release( STATUS state = STATUS::UNKNOWN );
 
-    };
-// OneWireBus
+    }; // OneWireBus
 
 }// epd
 

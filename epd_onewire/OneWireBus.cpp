@@ -29,12 +29,11 @@ using namespace epd;
 
 
 bool OneWireBus::bus_reset()
-{
+{    
+    if ( !_bus_guard() ) return false;
+
     ESP_LOGD( TAG, "::bus_reset - Start" );
 
-    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
-
-    m_reset = true;
     m_presence = false;
     onewire_pulses_t pulses;
     bool reset { _bus_reset( pulses ) };
@@ -77,7 +76,7 @@ bool OneWireBus::bus_reset()
         }
     }
 
-    xSemaphoreGive( m_aquire_bus_mutex );
+    _bus_release( STATUS::RESET );
 
     ESP_LOGD( TAG, "::bus_reset - End. Presence: %d", m_presence );
 
@@ -85,23 +84,20 @@ bool OneWireBus::bus_reset()
 }    // bus_reset
 
 
-bool OneWireBus::match_rom( uint64_t address, uint8_t func )
+bool OneWireBus::match_rom( uint64_t address, bool autoreset )
 {
+    if ( !_bus_guard_and_reset() ) return false;
+
     ESP_LOGD( TAG, "::match_rom - Start" );
 
-    if ( !m_reset ) return false;
-    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
-
-    m_reset = false;
-
-    onewire_data_t MatchRom = { 0x55 };
-    MatchRom.insert( MatchRom.end(), address );
+    onewire_data_t cmd = { 0x55 };
+    cmd.insert( cmd.end(), address );
     onewire_data_t data;
 
-    _write_slots( MatchRom );
+    _write_slots( cmd );
     _read_slots( 1, data );
 
-    xSemaphoreGive( m_aquire_bus_mutex );
+    _bus_release( STATUS::ADDRESSED );
 
     ESP_LOGD( TAG, "::match_rom - End" );
 
@@ -109,19 +105,17 @@ bool OneWireBus::match_rom( uint64_t address, uint8_t func )
 }    // match_rom
 
 
-bool OneWireBus::read_rom(onewire_rom_code_t& romcode)
+bool OneWireBus::read_rom( onewire_rom_code_t& romcode, bool autoreset )
 {
+    static onewire_data_t cmd = { 0x33 };
+
+    if ( !_bus_guard_and_reset() ) return false;
+
     ESP_LOGD( TAG, "::read_rom - Start" );
 
-    if ( !m_reset ) return false;
-    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
-
-    static onewire_data_t ReadRom = { 0x33 };
-
-    m_reset = false;
     onewire_data_t data;
 
-    _write_slots( ReadRom );
+    _write_slots( cmd );
     _read_slots( 64, data );
 
     if ( data.size() == 8 )     // 64 bits returned
@@ -137,7 +131,7 @@ bool OneWireBus::read_rom(onewire_rom_code_t& romcode)
     ESP_LOGI( TAG, "ROM Code: 0x%02X 0x%02X%02X%02X%02X%02X%02X 0x%02X", data [ 0 ], data [ 1 ], data [ 2 ], data [ 3 ],
             data [ 4 ], data [ 5 ], data [ 6 ], data [ 7 ] );
 
-    xSemaphoreGive( m_aquire_bus_mutex );
+    _bus_release( STATUS::ADDRESSED );
 
     ESP_LOGD( TAG, "::read_rom - End" );
 
@@ -145,22 +139,20 @@ bool OneWireBus::read_rom(onewire_rom_code_t& romcode)
 }    // read_rom
 
 
-bool OneWireBus::search_rom( onewire_search_state_t& search_state )
+bool OneWireBus::search_rom( onewire_search_state_t& search_state, bool autoreset )
 {
+    static onewire_data_t cmd = { 0xF0 };
+
+    if ( !_bus_guard_and_reset( autoreset ) ) return false;
+
     ESP_LOGD( TAG, "::search_rom - Start" );
 
-    if ( !m_reset ) return false;
-    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
-
-    static onewire_data_t SearchRom = { 0xF0 };
-
-    m_reset = false;
     onewire_data_t data { 0 };
     uint8_t id_bit_number { 1 }, last_zero { 0 }, rom_byte_mask { 1 }, rom_byte_number { 0 };
     bool search_direction;
     search_state.found = false;
 
-    _write_slots( SearchRom );
+    _write_slots( cmd );
 
     do
     /*
@@ -278,7 +270,7 @@ bool OneWireBus::search_rom( onewire_search_state_t& search_state )
 
     m_scanned = true;
 
-    xSemaphoreGive( m_aquire_bus_mutex );
+    _bus_release( STATUS::ADDRESSED );
 
     ESP_LOGD( TAG, "::search_rom - End" );
 
@@ -287,21 +279,17 @@ bool OneWireBus::search_rom( onewire_search_state_t& search_state )
 }    // search_rom
 
 
-bool OneWireBus::skip_rom()
+bool OneWireBus::skip_rom( bool autoreset )
 {
+    static onewire_data_t cmd { 0xCC };
+
+    if ( !_bus_guard_and_reset( autoreset ) ) return false;
+
     ESP_LOGD( TAG, "::skip_rom - Start" );
 
-    if ( !m_reset ) return false;
-    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
-
-    m_reset = false;
-    onewire_data_t cmd { 0xCC };
-    // onewire_data_t data;
-
     _write_slots( cmd );
-    // _read_slots( 1, data );
 
-    xSemaphoreGive( m_aquire_bus_mutex );
+    _bus_release( STATUS::ADDRESSED );
 
     ESP_LOGD( TAG, "::skip_rom - End" );
 
@@ -474,7 +462,7 @@ ADAPTIVE_TIMING OneWireBus::useAdaptive( bool setadaptive, ADAPTIVE_TIMING timin
     }
 
     return m_adaptive_timing;
-}
+} // useAdaptive
 
 bool OneWireBus::searchRomCodes()
 {
@@ -512,12 +500,11 @@ bool OneWireBus::searchRomCodes()
     ESP_LOGD( TAG, "::searchRomCodes - End\n\tBus %s", info() );
 
     return true;
-}    // searchRomCodes
+} // searchRomCodes
 
 
 bool OneWireBus::readRomCode()
 {
-    
     ESP_LOGD( TAG, "::readRomCode - Start\n\tBus %s", info() );
 
     onewire_rom_code_t rom_code;
@@ -549,26 +536,30 @@ bool OneWireBus::readRomCode()
 const std::vector< uint64_t >& OneWireBus::getRomCodes()
 {
     return m_rom_codes;
-}    // getRegistrationCodes
+} // getRegistrationCodes
 
 
 bool OneWireBus::writeAndRead( onewire_data_t& to_wire, uint16_t bits_to_read, onewire_data_t& from_wire )
 {
-    ESP_LOGD( TAG, "::writeAndRead - Start" );
-
-    if ( xSemaphoreTake(m_aquire_bus_mutex, 0) == pdFALSE ) return false;
-
-    m_reset = false;
-
-    _write_slots( to_wire );
-    _read_slots( bits_to_read, from_wire );
-
-    xSemaphoreGive( m_aquire_bus_mutex );
-
-    ESP_LOGD( TAG, "::writeAndRead - End" );
-    
-    return true;
+    bool result { _write_slots( to_wire ) };
+    if ( result && bits_to_read ) return _read_slots( bits_to_read, from_wire );
+    return result;
 } // writeAndRead
+
+
+bool OneWireBus::writeAndRead( uint8_t to_wire, uint16_t bits_to_read, onewire_data_t& from_wire )
+{
+    bool result { _write_slots( to_wire ) };
+    if ( result && bits_to_read ) return _read_slots( bits_to_read, from_wire );
+    return result;
+} // writeAndRead
+
+
+bool OneWireBus::write( uint8_t to_wire )
+{
+    return _write_slots( to_wire );
+} // write
+
 
 bool OneWireBus::isScanned()
 {
@@ -576,7 +567,36 @@ bool OneWireBus::isScanned()
 } // isScanned 
 
 
-// epd::STATUS OneWireBus::getStatus()
-// {
-//     return m_status;
-// }
+epd::STATUS OneWireBus::getStatus()
+{
+    return m_status;
+} // getStatus
+
+
+/* -----------------------------------------------------------------------------
+ * Private
+ * -----------------------------------------------------------------------------
+ */
+
+inline bool OneWireBus::_bus_guard_and_reset( bool autoreset, TickType_t xBlockTime ) 
+{ 
+    return  (   m_status == STATUS::RESET
+            ||  (   autoreset 
+                &&  bus_reset() 
+                )   
+            )
+            &&  ( xSemaphoreTakeRecursive(m_aquire_bus_mutex, xBlockTime) == pdTRUE ); 
+};
+
+
+inline bool OneWireBus::_bus_guard( TickType_t xBlockTime) 
+{ 
+    return  ( xSemaphoreTakeRecursive(m_aquire_bus_mutex, xBlockTime) == pdTRUE ); 
+};
+
+
+inline void OneWireBus::_bus_release( STATUS state )
+{
+    m_status = state;
+    xSemaphoreGiveRecursive( m_aquire_bus_mutex );
+}
