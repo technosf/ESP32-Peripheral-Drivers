@@ -106,12 +106,6 @@ namespace epd
             }
 
 
-            /**
-             * @brief Initialize the ESP32 peripherals ready for bus operations
-             */
-            void initialize();
-
-
         private:
 
             /**
@@ -139,12 +133,26 @@ namespace epd
             /**
              * @see OneWireBus
              */
+            bool _write_slots( uint8_t data );
+
+
+            /**
+             * @see OneWireBus
+             */
             bool _read_slots( uint16_t bits, onewire_data_t& data );
+
 
             /**
              * @see OneWireBus
              */
             virtual void _set_adaptive_timing( ADAPTIVE_TIMING timing );
+
+
+            /**
+             * @brief Initialize the ESP32 peripherals ready for bus operations
+             */
+            bool _initialize();
+
 
             /* --------------------------------------------------------------
              * Implementation Specifics
@@ -159,7 +167,6 @@ namespace epd
              * @return the number of items returned
              */
             size_t _probe( onewire_pulses_t& pulses );
-
 
             
             /* --------------------------------------------------------------

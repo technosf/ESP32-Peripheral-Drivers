@@ -94,7 +94,7 @@ OneWireBusRMT::~OneWireBusRMT()
 
 // --
 
-void OneWireBusRMT::initialize()
+bool OneWireBusRMT::_initialize()
 {
     ESP_ERROR_CHECK( gpio_set_direction( m_rx_pin, GPIO_MODE_INPUT_OUTPUT ) );      // RX
     ESP_ERROR_CHECK( gpio_set_pull_mode( m_rx_pin, GPIO_PULLUP_ONLY ) );            // Pullup only
@@ -169,6 +169,7 @@ void OneWireBusRMT::initialize()
     ESP_LOGD( TAG, "::initialize - RMT device on pins %d, %d / channels %d, %d initialized.", m_rx_pin, m_tx_pin,
             m_rx_channel, m_tx_channel );
 
+    return true;
 }    // initialize
 
 
@@ -234,6 +235,17 @@ bool OneWireBusRMT::_write_slots( uint16_t bits, const onewire_data_t& data )
 }    // _write_slots
 
 
+bool OneWireBusRMT::_write_slots( uint8_t data )
+{
+    ESP_LOGV( TAG, "::_write_slots - Start\n\t Writing byte %02X", data );
+
+    ESP_ERROR_CHECK( rmt_write_sample( m_tx_channel, &data, 1, true ) );
+
+    ESP_LOGV( TAG, "::_write_slots - End" );
+    return true;
+}
+
+
 bool OneWireBusRMT::_read_slots( uint16_t bits, onewire_data_t& data )
 {
     if ( !bits ) return true;
@@ -253,12 +265,14 @@ bool OneWireBusRMT::_read_slots( uint16_t bits, onewire_data_t& data )
 
     ESP_ERROR_CHECK( rmt_rx_start( m_rx_channel, true ) );    // Read before writing as the device will modify the write slot
     ESP_ERROR_CHECK( rmt_write_items( m_tx_channel, rmt_items, bits, true ) );
-    _probe( pulses );
+    size_t g = _probe( pulses );
     ESP_ERROR_CHECK( rmt_rx_stop( m_rx_channel ) );
 
     bool result = ( _unmarshal_pulses( pulses, data, FAIL ) == bits );
 
-    ESP_LOG_BUFFER_HEX_LEVEL( TAG, &data, ( bits / 8 ) + 1, ESP_LOG_VERBOSE );
+    ESP_LOGV( TAG, "::_read_slots - Probe: %d   Unmarshal: %u", g,result );
+
+    ESP_LOG_BUFFER_HEX_LEVEL( TAG, &data, (bits % 8) ? ( bits / 8 ) + 1 : ( bits / 8 ) , ESP_LOG_VERBOSE );
 
     free( rmt_items );
     

@@ -26,10 +26,15 @@
 #define EPD_ONEWIREBUS_H_
 
 
+//#define OW_THREADSAFE 
+#undef OW_THREADSAFE 
+
 /* One Wire Over-Drive Timings in Micro Seconds (US) */
 /* Timings from https://pdfserv.maximintegrated.com/en/an/AN126.pdf */
 
+//#define OW_OVERDRIVE 
 #undef OW_OVERDRIVE 
+
 
 #ifndef OW_OVERDRIVE
     #pragma message "OWR Standard timings used."
@@ -127,15 +132,8 @@ namespace epd
      */
     using onewire_rom_code_t = uint64_t;
 
-    /**
-     * @brief OneWireBus power source
-     * 
-     */
-    enum PWR_SRC
-    {
-        BUS, 
-        PARASITIC,
-    };
+ 
+
     /**
      * @brief OneWireBus power source
      * 
@@ -172,7 +170,16 @@ namespace epd
 
         public:
 
-
+            /**
+             * @brief OneWire 
+             * 
+             */
+            enum PWR_SRC
+            {
+                UNKNOWN, 
+                BUS, 
+                PARASITIC,
+            };
 
 
             /*
@@ -263,6 +270,13 @@ namespace epd
              * @brief Information about this implementation of the bus protocol
              */
             const virtual char* info() = 0;
+
+
+            /**
+             * @brief Initialize the bus for operation
+             */
+            bool initialize();
+
 
             /* --------------------------------------------------------
              *
@@ -459,14 +473,23 @@ namespace epd
             virtual bool writeAndRead( uint8_t to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
             virtual bool write( uint8_t to_wire );
 
+            /**
+             * @brief Reads bus every 100ms until a 1 is read
+             * 
+             * @param maxSlots manimum number of slots
+             * @return true 
+             * @return false 
+             */
+            virtual bool readUntilOne( uint8_t maxSlots );
+
 
             /**
-             * @brief Has the bus been scanned for all attached devices
+             * @brief Has the bus been searched for all attached devices
              * 
-             * @return true bus has been successfully scanned
-             * @return false bus has not been successfully scanned
+             * @return true bus has been successfully searched
+             * @return false bus has not been successfully searched
              */
-            virtual bool isScanned();
+            virtual bool isSearched();
 
             /**
              * @brief Get the bus Status
@@ -515,6 +538,15 @@ namespace epd
              * @return true if written
              */
             virtual bool _write_slots( uint16_t bits, const onewire_data_t& data ) = 0;
+
+
+            /**
+             * @brief Write the given whole byte of data to the bus
+             *
+             * @param data the data byte to write
+             * @return true if written
+             */
+            virtual bool _write_slots( uint8_t data ) = 0;
 
 
             /**
@@ -584,11 +616,18 @@ namespace epd
              */
             virtual void _set_adaptive_timing( ADAPTIVE_TIMING timing ) = 0;
 
+            /**
+             * @brief Initialize the bus
+             * 
+             */
+            virtual bool _initialize( ) = 0;
+
 
         private:
 
+#ifdef OW_THREADSAFE
             const SemaphoreHandle_t m_aquire_bus_mutex { xSemaphoreCreateRecursiveMutex() };    // Coordinate commandeering the bus
-
+#endif
             bool m_presence { false };                      // Presence pulse seen
             bool m_scanned { false };                       // Bus has been scanned for devices and devices are known
             STATUS m_status { STATUS::UNKNOWN };            //!< Bus status

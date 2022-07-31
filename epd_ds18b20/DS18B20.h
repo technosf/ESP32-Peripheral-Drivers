@@ -55,16 +55,47 @@ namespace epd
     {
             static const constexpr char* TAG { "DS18B20" };     //!< ESP_LOG Tag 
 
-            /**
-             * @brief OneWire 
-             * 
-             */
-            enum class PWR_SRC
-            {
-                UNKNOWN, BUS, PARASITIC,
-            };
 
         public:
+
+            DS18B20( onewire_rom_code_t reg, OneWireBus* bus );
+
+            struct scratchpad_t
+            {
+                union {
+                    uint8_t raw [9];
+                    struct {   
+                        uint8_t TEMP_LSB;
+                        uint8_t TEMP_MSB;
+                        uint8_t T_H_REGISTER;
+                        uint8_t T_L_REGISTER;
+                        uint8_t CONFIG;
+                        uint8_t RESERVED_FFH;
+                        uint8_t RESERVED;
+                        uint8_t RESERVED_10H;
+                        uint8_t CRC;
+                    } eeprom;
+                    // struct {   
+                    //     uint8_t CRC;
+                    //     uint8_t RESERVED_10H;
+                    //     uint8_t RESERVED;
+                    //     uint8_t RESERVED_FFH;
+                    //     uint8_t CONFIG;
+                    //     uint8_t T_L_REGISTER;
+                    //     uint8_t T_H_REGISTER;
+                    //     uint8_t TEMP_MSB;
+                    //     uint8_t TEMP_LSB;
+                    // } eeprom;
+                };
+            };
+
+
+/* --------------------------------------------------------
+*
+*   Statics
+*
+*  --------------------------------------------------------
+*/
 
             /**
              * The family code for DS18B20
@@ -86,20 +117,20 @@ namespace epd
              * @param bus the bus to scan
              * @return true if scan occurred
              */
-            static bool identify( OneWireBus* bus );
+            //static bool identify( OneWireBus* bus );
 
             /**
              * @brief Returns a vector of all identified DS18B20's on any bus
              * @return DS18B20 devices
              */
-            static std::vector< DS18B20* > getDevices();
+           // static std::vector< DS18B20* > getDevices();
 
             /**
              * @brief Returns a vector of all identified DS18B20's on this bus
              * @param bus the bus to get DS18B20 devices on
              * @return DS18B20 devices
              */
-            static std::vector< DS18B20* > getDevices( OneWireBus* bus );
+            static std::vector< DS18B20* > getDevices( OneWireBus* bus, bool autosearch = true );
 
             /* --------------------------------------------------------
              *
@@ -112,14 +143,14 @@ namespace epd
              * @brief What power source - Is this device using parasitic power?
              * @return true if it is, false if not or unknown.
              */
-            PWR_SRC getPowerSource();
+            //virtual PWR_SRC getPowerSource();
 
             /**
              *
              * @param bus
              * @return
              */
-            PWR_SRC getPowerSource( OneWireBus* bus );
+            //virtual PWR_SRC getPowerSource( OneWireBus* bus );
 
             /**
              *
@@ -133,7 +164,7 @@ namespace epd
              * --------------------------------------------------------
              */
 
-        protected:
+        //protected:
             /**
              * @brief Issue a Convert T command on the given bus
              *
@@ -146,28 +177,28 @@ namespace epd
              * @param bus the bus to issue the command on
              * @return the value converted into Celsius
              */
-            static float read_scratchpad( OneWireBus* bus );
+            static bool read_scratchpad( OneWireBus* bus, scratchpad_t& scratchpad );
 
             /**
              * @brief
              * @param bus
              * @return
              */
-            static bool write_scratchpad( OneWireBus* bus );
+            //static bool write_scratchpad( OneWireBus* bus );
 
             /**
              * @brief
              * @param bus
              * @return
              */
-            static bool copy_scratchpad( OneWireBus* bus );
+            //static bool copy_scratchpad( OneWireBus* bus );
 
             /**
              * @brief
              * @param bus
              * @return
              */
-            static bool recall_e2( OneWireBus* bus );
+            //static bool recall_e2( OneWireBus* bus );
 
             /**
              * @brief Issue a Read Power Supply command on the bus and store the result
@@ -178,9 +209,18 @@ namespace epd
              *
              * @return the power source, if known
              */
-            static PWR_SRC read_power_supply( OneWireBus* bus );
+            //static PWR_SRC read_power_supply( OneWireBus* bus );
 
         private:
+
+            /**
+             * @brief Instantiate new DHT22
+             * @param pin the GPIO pin connected to the DHT22 data line
+             * @param channel the RMT channel to use to capture data
+             */
+            //DS18B20( onewire_rom_code_t reg, OneWireBus* bus );
+
+
 
             /**
              * @brief Busses with identified DS18B20 devices, and if they are know and parasitic
@@ -188,25 +228,20 @@ namespace epd
           //  static std::unordered_map< OneWireBus*, PWR_SRC > BUS_POWER;
 
             /**
-             * @brief DS18B20 Reg codes and their devices
+             * @brief All known DS18B20 ROM codes and their devices
              */
-            static std::unordered_map< uint64_t, DS18B20* > DEVICE_CODES;
+            static std::unordered_map< onewire_rom_code_t, DS18B20 > DEVICE_ROM_CODES_BUS;
 
             /**
              * @brief DS18B20 reg codes and their busses
              */
-            static std::unordered_map< DS18B20*, OneWireBus* > DEVICE_BUSSES;
+           // static std::unordered_map< DS18B20*, OneWireBus* > DEVICE_BUSSES;
 
             OneWireBus* m_bus;    // Bus this device is connected to
-            PWR_SRC m_parasitic_power { PWR_SRC::UNKNOWN };    // Is this device using parasitic power
-            float last_celsius_reading { TEMP_UNDEFINED };
+            //PWR_SRC m_parasitic_power { PWR_SRC::UNKNOWN };    // Is this device using parasitic power
+            //float last_celsius_reading { TEMP_UNDEFINED };
 
-            /**
-             * @brief Instantiate new DHT22
-             * @param pin the GPIO pin connected to the DHT22 data line
-             * @param channel the RMT channel to use to capture data
-             */
-            DS18B20( uint64_t reg, OneWireBus* bus );
+
 
     };
 // DS18B20

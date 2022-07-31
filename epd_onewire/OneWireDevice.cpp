@@ -127,7 +127,7 @@ uint8_t OneWireDevice::getCrc()
 } // getCrc
 
 
-uint64_t OneWireDevice::getSerialNumber()
+onewire_rom_code_t OneWireDevice::getSerialNumber()
 {
     return m_serial_number;
 } // getSerialNumber
@@ -149,7 +149,7 @@ epd::OneWireBus* OneWireDevice::isBusAttached(epd::OneWireBus* bus, bool clearBu
 {
     if ( !bus ) return m_one_wire_bus;
 
-    if ( !bus->isScanned() || !bus->searchRomCodes() ) 
+    if ( !bus->isSearched() || !bus->searchRomCodes() ) 
     // Bus not scanned, or requested to be cl
         return nullptr;
     

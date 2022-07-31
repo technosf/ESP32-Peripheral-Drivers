@@ -33,6 +33,8 @@
 
 #include "OneWireBus.h"
 
+using PWR_SRC = epd::OneWireBus::PWR_SRC;
+
 namespace epd
 {
 
@@ -59,7 +61,7 @@ namespace epd
              * @param reg the reg code
              * @return true if valid
              */
-            static bool validate( uint64_t reg );
+            static bool validate( onewire_rom_code_t reg );
 
 
             /**
@@ -68,7 +70,7 @@ namespace epd
              * @param reg the reg code
              * @return the family
              */
-            static uint8_t family( uint64_t reg );
+            static uint8_t family( onewire_rom_code_t reg );
 
 
             /**
@@ -76,7 +78,7 @@ namespace epd
              *
              * @param reg raw registration data from the device
              */
-            OneWireDevice( uint64_t reg );
+            OneWireDevice( onewire_rom_code_t reg );
 
 
             /**
@@ -98,7 +100,7 @@ namespace epd
              * 
              * @return  rom code
              */
-            onewire_rom_code_t getRomCode();
+             onewire_rom_code_t getRomCode();
 
 
             /**
@@ -114,7 +116,7 @@ namespace epd
              * 
              * @return Six byte serial number
              */
-            uint64_t getSerialNumber();
+            onewire_rom_code_t getSerialNumber();
 
 
             /**
@@ -122,14 +124,14 @@ namespace epd
              * 
              * @return the device family code
              */
-            uint8_t getFamily();
+             uint8_t getFamily();
 
             /**
              * @brief Indicates if the ROM code for this device is valid
              * 
              * @return true if valid
              */
-            bool isValid();
+             bool isValid();
 
 
             /**
@@ -165,7 +167,7 @@ namespace epd
 
             onewire_rom_code_t m_rom_code;                  //!< Device ROM code
             uint8_t m_crc;                                  //!< Device CRC
-            uint64_t m_serial_number {0};                   //!< Device serial number
+            onewire_rom_code_t m_serial_number {0};         //!< Device serial number
             uint8_t m_family;                               //!< Device family
             bool m_valid { false };                         //!< Device valid flag
             std::string m_info;                             //!< Device info

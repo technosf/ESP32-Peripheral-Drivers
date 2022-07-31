@@ -28,6 +28,13 @@
 using namespace epd;
 
 
+bool OneWireBus::initialize()
+{
+    if ( _initialize() ) return searchRomCodes();
+    return false;
+}
+
+
 bool OneWireBus::bus_reset()
 {    
     if ( !_bus_guard() ) return false;
@@ -268,8 +275,6 @@ bool OneWireBus::search_rom( onewire_search_state_t& search_state, bool autorese
         search_state.found = true;
     }
 
-    m_scanned = true;
-
     _bus_release( STATUS::ADDRESSED );
 
     ESP_LOGD( TAG, "::search_rom - End" );
@@ -341,8 +346,8 @@ void OneWireBus::_process_pulse( onewire_pulses_t& pulses, bool level_high, uint
 uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, unmarshal_behavior_t behavior )
 {
 
-    ESP_LOG_BUFFER_HEX_LEVEL( TAG, &pulses, pulses.size(),ESP_LOG_VERBOSE);
-    ESP_LOG_BUFFER_HEX_LEVEL( TAG, &data, data.size(),ESP_LOG_VERBOSE);
+   // ESP_LOG_BUFFER_HEX_LEVEL( TAG, &pulses, pulses.size(),ESP_LOG_VERBOSE);
+    //ESP_LOG_BUFFER_HEX_LEVEL( TAG, &data, data.size(),ESP_LOG_VERBOSE);
 
     if ( pulses [ 0 ] < 0 )
     /*
@@ -425,7 +430,8 @@ uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t
         }
     }    // for
 
-    return ( ( ( bit + 1 ) % 8 ) + ( byte * 8 ) );
+    if ( 8 == ++bit ) byte++;
+    return ( ( bit % 8 ) + ( byte * 8 ) );
 
 }    // _unmarshal_pulses
 
@@ -497,7 +503,9 @@ bool OneWireBus::searchRomCodes()
 
     m_rom_codes.swap( rom_codes );
 
-    ESP_LOGD( TAG, "::searchRomCodes - End\n\tBus %s", info() );
+    m_scanned = true;
+
+    ESP_LOGD( TAG, "::searchRomCodes - End\n\tBus type: %s   Found %d devices.", info(), m_rom_codes.size() );
 
     return true;
 } // searchRomCodes
@@ -557,14 +565,27 @@ bool OneWireBus::writeAndRead( uint8_t to_wire, uint16_t bits_to_read, onewire_d
 
 bool OneWireBus::write( uint8_t to_wire )
 {
+    ESP_LOGD( TAG, "::write - to_wire: %u",to_wire);
     return _write_slots( to_wire );
 } // write
 
 
-bool OneWireBus::isScanned()
+bool OneWireBus::readUntilOne( uint8_t maxSlots )
+{
+    onewire_data_t data;
+    for ( uint8_t i = 0; i < maxSlots; i++ )
+    {
+	    vTaskDelay(100 / portTICK_PERIOD_MS);
+        data.clear();
+        if ( _read_slots( 1, data ) && data.front() == 1 ) return true;
+    }
+    return false;
+}
+
+bool OneWireBus::isSearched()
 {
     return m_scanned;
-} // isScanned 
+} // isSearched 
 
 
 epd::STATUS OneWireBus::getStatus()
@@ -584,19 +605,30 @@ inline bool OneWireBus::_bus_guard_and_reset( bool autoreset, TickType_t xBlockT
             ||  (   autoreset 
                 &&  bus_reset() 
                 )   
-            )
-            &&  ( xSemaphoreTakeRecursive(m_aquire_bus_mutex, xBlockTime) == pdTRUE ); 
+            ) 
+#ifdef OW_THREADSAFE            
+            && ( xSemaphoreTakeRecursive(m_aquire_bus_mutex, xBlockTime) == pdTRUE );
+#else
+            && true;
+#endif             
 };
 
 
 inline bool OneWireBus::_bus_guard( TickType_t xBlockTime) 
 { 
+#ifdef OW_THREADSAFE
     return  ( xSemaphoreTakeRecursive(m_aquire_bus_mutex, xBlockTime) == pdTRUE ); 
+#else
+    return true;
+#endif
 };
 
 
 inline void OneWireBus::_bus_release( STATUS state )
 {
     m_status = state;
+
+#ifdef OW_THREADSAFE
     xSemaphoreGiveRecursive( m_aquire_bus_mutex );
+#endif
 }
