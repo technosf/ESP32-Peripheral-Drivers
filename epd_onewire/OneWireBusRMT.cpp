@@ -40,27 +40,27 @@ using namespace epd;
 
 // -- Helper forward declarations
 
-static rmt_item32_t RMT_PULSE( uint16_t duration0, bool level0, uint16_t duration1, bool level1 );
+static rmt_item32_t _RMT_PULSE( uint16_t duration0, bool level0, uint16_t duration1, bool level1 );
 
-static void U8_TO_RMT( const void* src, rmt_item32_t* dest, size_t src_size, size_t wanted_num, size_t* translated_size,
+static void _U8_TO_RMT( const void* src, rmt_item32_t* dest, size_t src_size, size_t wanted_num, size_t* translated_size,
         size_t* item_num );
 
 // -- 
 
 static rmt_item32_t OWR_RESET =    //!< RMT Reset Pulse Definition
-        RMT_PULSE( OWR_TICKS_PER_US * OW_RESET_TIME_US, 0, 0, 1 );
+        _RMT_PULSE( OWR_TICKS_PER_US * OW_RESET_TIME_US, 0, 0, 1 );
 
 static rmt_item32_t OWR_READ_SLOT =    //!< RMT Read Slot Pulse Definition
-        RMT_PULSE( OWR_TICKS_PER_US * OW_READ_SLOT_LOW_US, 0,
+        _RMT_PULSE( OWR_TICKS_PER_US * OW_READ_SLOT_LOW_US, 0,
                 OWR_TICKS_PER_US * ( OW_SLOT_TIME_US - OW_READ_SLOT_LOW_US ),
                 1 );
 
 static rmt_item32_t OWR_WRITE_SLOT_0 =    //!< RMT Write Zero Slot Pulse Definition
-        RMT_PULSE( OWR_TICKS_PER_US * OW_WRITE_SLOT_0_LOW_US, 0,
+        _RMT_PULSE( OWR_TICKS_PER_US * OW_WRITE_SLOT_0_LOW_US, 0,
                 OWR_TICKS_PER_US * OW_WRITE_SLOT_0_HIGH_US, 1 );
 
 static rmt_item32_t OWR_WRITE_SLOT_1 =    //!< RMT Write One Slot Pulse Definition
-        RMT_PULSE( OWR_TICKS_PER_US * OW_WRITE_SLOT_1_LOW_US, 0,
+        _RMT_PULSE( OWR_TICKS_PER_US * OW_WRITE_SLOT_1_LOW_US, 0,
                 OWR_TICKS_PER_US * OW_WRITE_SLOT_1_HIGH_US, 1 );
 
 
@@ -155,7 +155,7 @@ bool OneWireBusRMT::_initialize()
     ESP_ERROR_CHECK( rmt_config( &rmt_tx ) );
     ESP_ERROR_CHECK( rmt_set_source_clk(m_tx_channel, OWR_CLOCK) ); // 80 Mhz.
     ESP_ERROR_CHECK( rmt_driver_install( m_tx_channel, 0, 0 ) );        // RMT data is cycled into a 512 byte RingBuffer
-    ESP_ERROR_CHECK( rmt_translator_init( m_tx_channel, U8_TO_RMT ) );  // Set full-byte translator
+    ESP_ERROR_CHECK( rmt_translator_init( m_tx_channel, _U8_TO_RMT ) );  // Set full-byte translator
 
     /*
      * Check the TX clock - Confirm we are using the APB clock
@@ -189,7 +189,7 @@ bool OneWireBusRMT::_strong_pullup( uint8_t pullup_duration_us )
 {
     ESP_LOGD( TAG, "::_strong_pullup" );
 
-//    rmt_item32_t strong_pullup_pulse = RMT_PULSE( pullup_duration_us, true, OW_RECOVERY_TIME_US, true );
+//    rmt_item32_t strong_pullup_pulse = _RMT_PULSE( pullup_duration_us, true, OW_RECOVERY_TIME_US, true );
 //
 //    ESP_ERROR_CHECK( rmt_rx_start( m_rx_channel, true ) );                // Start reading - we want the reset pulse too
 //    ESP_ERROR_CHECK( rmt_write_items( m_tx_channel, &strong_pullup_pulse, 1, true ) );    // Reset pulse
@@ -268,6 +268,7 @@ bool OneWireBusRMT::_read_slots( uint16_t bits, onewire_data_t& data )
     size_t g = _probe( pulses );
     ESP_ERROR_CHECK( rmt_rx_stop( m_rx_channel ) );
 
+    data.clear();
     bool result = ( _unmarshal_pulses( pulses, data, FAIL ) == bits );
 
     ESP_LOGV( TAG, "::_read_slots - Probe: %d   Unmarshal: %u", g,result );
@@ -276,7 +277,7 @@ bool OneWireBusRMT::_read_slots( uint16_t bits, onewire_data_t& data )
 
     free( rmt_items );
     
-    ESP_LOGV( TAG, "::_read_slots - End" );
+    ESP_LOGV( TAG, "::_read_slots - End %d", result );
     return result;
 }    // _read_slots
 
@@ -319,6 +320,7 @@ size_t OneWireBusRMT::_probe( onewire_pulses_t& pulses )
     return index;
 }    // _probe
 
+
 void OneWireBusRMT::_set_adaptive_timing( ADAPTIVE_TIMING timing )  // TODO implement
 {
     switch ( timing )
@@ -350,7 +352,7 @@ void OneWireBusRMT::_set_adaptive_timing( ADAPTIVE_TIMING timing )  // TODO impl
  * @param level1 
  * @return rmt_item32_t 
  */
-static rmt_item32_t RMT_PULSE( uint16_t duration0, bool level0, uint16_t duration1, bool level1 )
+static rmt_item32_t _RMT_PULSE( uint16_t duration0, bool level0, uint16_t duration1, bool level1 )
 {
     rmt_item32_t pulse;
     pulse.duration0 = duration0;
@@ -377,7 +379,7 @@ static rmt_item32_t RMT_PULSE( uint16_t duration0, bool level0, uint16_t duratio
  * @param translated_size the number of bytes translated
  * @param item_num the number of translated rmt_item32_t
  */
-static void U8_TO_RMT( const void* src, rmt_item32_t* dest, size_t src_size, size_t wanted_num, size_t* translated_size,
+static void _U8_TO_RMT( const void* src, rmt_item32_t* dest, size_t src_size, size_t wanted_num, size_t* translated_size,
         size_t* item_num )
 {
     ESP_LOGV( "OneWireBusRMT", "::U8_TO_RMT - Start\n\tSrc Size:%d   Wanted Num:%d", src_size, wanted_num );

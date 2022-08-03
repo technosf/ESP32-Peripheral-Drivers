@@ -26,18 +26,15 @@
 
 using namespace epd;
 
-// std::unordered_map< OneWireBus*, DS18B20::PWR_SRC > DS18B20::BUS_POWER;
-std::unordered_map< onewire_rom_code_t, DS18B20 > DS18B20::DEVICE_ROM_CODES_BUS;
-//std::unordered_map< DS18B20*, OneWireBus* > DS18B20::DEVICE_BUSSES;
-//std::vector< DS18B20 > DEVICE_ROM_CODES_BUS;
+std::unordered_map< OneWireBus*, PWR_SPLY > DS18B20::BUS_POWER; 
+std::unordered_map< onewire_rom_code_t, DS18B20* > DS18B20::DEVICE_ROM_CODES_BUS;
 
-
-DS18B20::DS18B20( onewire_rom_code_t reg, OneWireBus* bus ) :
-        OneWireDevice::OneWireDevice( reg )
+DS18B20::DS18B20( onewire_rom_code_t romcode, OneWireBus* bus ) :
+        OneWireDevice::OneWireDevice( romcode )
 {
     if ( FAMILY == getFamily() )
     {
-        m_bus = bus;
+        p_bus = bus;
     }
     else
     {
@@ -48,84 +45,122 @@ DS18B20::DS18B20( onewire_rom_code_t reg, OneWireBus* bus ) :
 
 DS18B20::~DS18B20()
 {
+    DEVICE_ROM_CODES_BUS.erase(getRomCode());
 }
-
-
-// bool DS18B20::identify( OneWireBus* bus )
-// {
-//     ESP_LOGD( TAG, "::identify - Start" );
-
-//     for ( auto& code : bus->getRomCodes() )
-//     {
-//         if ( !OneWireDevice::validate( code ) )
-//         {
-//             ESP_LOGD( TAG, "::identify - Invalid Reg Code" );
-//             ESP_LOG_BUFFER_HEX_LEVEL( TAG, &code, 8, ESP_LOG_DEBUG );
-//             break;
-//         }
-
-//         DS18B20* ds18b20 = DS18B20::DEVICE_CODES [ code ];
-//         if ( ds18b20 != nullptr )
-//         /*
-//          * Clear previous entry for this reg code
-//          */
-//         {
-//             DS18B20::DEVICE_CODES.erase( code );
-//             DS18B20::DEVICE_BUSSES.erase( ds18b20 );
-//            // DS18B20::DEVICE_POWER.erase( ds18b20 );
-//         }
-//         //  OneWireDevice device( code );
-
-//         if ( FAMILY == OneWireDevice::family( code ) )
-//         /*
-//          * Only collate devices in our family
-//          */
-//         {
-//             ds18b20 = new DS18B20( code, bus );
-//             DS18B20::DEVICE_CODES.emplace( code, ds18b20 );
-//             DS18B20::DEVICE_BUSSES.emplace( ds18b20, bus );
-//            // DS18B20::BUS_POWER.emplace( ds18b20, PWR_SRC::UNKNOWN );
-//             //DS18B20::BUSSES.emplace( bus );
-//             ESP_LOGD( TAG, "::identify - Found %s", ds18b20->info() );
-//         }
-//     }    // for
-
-//     ESP_LOGD( TAG, "::identify - End" );
-//     return true;
-// }    // identify
-
-
-// std::vector< DS18B20* > DS18B20::getDevices()
-// {
-//     std::vector< DS18B20* > devices;
-//     for ( auto& codedevice : DS18B20::DEVICE_CODES )
-//     {
-//         devices.push_back( codedevice.second );
-//     }
-//     return devices;
-// }    // getDevices
 
 
 std::vector< DS18B20* > DS18B20::getDevices( OneWireBus* bus, bool autosearch )
 {
+    ESP_LOGD( TAG, "::getDevices - Start" );
+
     std::vector< DS18B20* > devices;
-    if ( bus && ( bus->isSearched() || ( !bus->isSearched() && autosearch && bus->searchRomCodes() ) ) )
+    if ( bus && ( bus->isSearched() || ( !bus->isSearched() && autosearch && bus->cmdSearchRomCodes() ) ) )
     {
-        ESP_LOGD( TAG, "::getDevices - Start" );
         
         for ( onewire_rom_code_t romcode : bus->getRomCodes() )
         {
             if ( FAMILY == family(romcode) ) 
             {  
-                DEVICE_ROM_CODES_BUS.insert( std::pair<onewire_rom_code_t, DS18B20>(romcode, DS18B20 { romcode, bus } ) );
-                devices.push_back(&DEVICE_ROM_CODES_BUS.at(romcode));
+                DS18B20* obj = new DS18B20( romcode, bus );;
+                DEVICE_ROM_CODES_BUS.emplace( romcode, obj );
+                devices.push_back(obj);
             }
         }
-        ESP_LOGD( TAG, "::getDevices - End. Count %d", devices.size() );
     }
+
+    ESP_LOGD( TAG, "::getDevices - End. Count %d", devices.size() );
+
     return devices;
 }    // getDevices
 
+
+/* --------------------------------------------------------
+*
+* High Level Functions
+*
+* --------------------------------------------------------
+*/
+
+
+DS18B20::scratchpad_t DS18B20::getScratchpad()
+{
+    return m_scratchpad;
+}
+
+bool DS18B20::cmdConvertT( bool thisdevice )
+{
+    ESP_LOGD( TAG, "::cmdConvertT - Start. This device %d", thisdevice );
+
+    if ( ( thisdevice && !p_bus->cmdAddressDevice( getRomCode() )  )   // this device and cannot address it
+        ||  ( !thisdevice && !p_bus->cmd_skip_rom() )                  // not this device and cannot skip rom
+        ) return false;
+
+    bool result = cmd_convert_t( p_bus );
+
+    ESP_LOGD( TAG, "::cmdConvertT - End. " );
+
+    return result;    
+} // cmdConvertT
+
+
+bool DS18B20::cmdReadScratchpad()
+{
+    return ( p_bus->cmdAddressDevice( getRomCode() ) && cmd_read_scratchpad( p_bus, m_scratchpad ) );
+}
+
+PWR_SPLY DS18B20::cmdReadPowerSupply()     
+{
+    ESP_LOGD( TAG, "::cmdReadPowerSupply - Start. " );
+
+    PWR_SPLY result { PWR_SPLY::UNKNOWN };
+
+    if ( !DS18B20::BUS_POWER[p_bus] && p_bus->cmd_skip_rom() )
+    // Determine nominal bus power supply
+    {
+        result = cmd_read_power_supply( p_bus );
+        DS18B20::BUS_POWER.emplace( p_bus, result);
+    }
+    else
+    {
+        result = DS18B20::BUS_POWER[p_bus];
+    }
+
+    if ( !m_power_supply && result ) 
+    // Do not know device PS, but know nominal bus PS
+    {
+        if ( PWR_SPLY::PARASITIC == result && p_bus->cmdAddressDevice( getRomCode() ) )
+        // Parasitic devices on bus, is this device one?
+        {
+            result = cmd_read_power_supply(p_bus);
+        } 
+        else if ( PWR_SPLY::PARASITIC == result )
+        {
+              result = PWR_SPLY::UNKNOWN;     // Could not address device
+        }
+        m_power_supply = result;
+    }
+
+    ESP_LOGD( TAG, "::cmdReadPowerSupply - End. " );
+
+    return result;
+}
+
+/* --------------------------------------------------------
+*
+* Helpers
+*
+* --------------------------------------------------------
+*/
+
+uint8_t DS18B20::getResolution()
+{
+    return m_scratchpad.getResolution();
+}
+
+float DS18B20::getTemperature()
+{
+    return m_scratchpad.getTemperature();
+}
 
 /* --------------------------------------------------------
  *
@@ -134,16 +169,14 @@ std::vector< DS18B20* > DS18B20::getDevices( OneWireBus* bus, bool autosearch )
  * --------------------------------------------------------
  */
 
-bool DS18B20::convert_t( OneWireBus* bus )
+bool DS18B20::cmd_convert_t( OneWireBus* bus )
 {
     ESP_LOGI( TAG, "::convert_t - Start" );
 
-    //onewire_data_t ConvertT { 0x44 };
-    //onewire_data_t data { 0 };
-
-    //if ( !bus->writeAndRead( ConvertT, 8, data ) ) return false;
-    if ( !bus->write( 0x44 ) ) return false;
-    bus->readUntilOne(128);
+    if ( !bus->wireWrite( 0x44 ) ) return false;
+    bus->wireReadUntilOne(32);                      // Read 32 slots at interval until 1 or end
+    
+    // TODO Parasitic
 
     ESP_LOGD( TAG, "::convert_t - End" );
     return true;
@@ -151,69 +184,69 @@ bool DS18B20::convert_t( OneWireBus* bus )
 }    // convert_t
 
 
-bool DS18B20::read_scratchpad( OneWireBus* bus, scratchpad_t& scratchpad )
+bool DS18B20::cmd_read_scratchpad( OneWireBus* bus, scratchpad_t& scratchpad )
 {
     ESP_LOGD( TAG, "::read_scratchpad - Start" );
-    //onewire_data_t ReadScratchpad { 0xBE };
-    onewire_data_t data { 0 };
+    
+    onewire_data_t data;
 
-    if ( !bus->writeAndRead( 0xBE, 9*8, data ) ) return false;
-   std::copy(data.begin(), data.end(), scratchpad.raw);
-    //scratchpad = (scratchpad_t)data.data();
+    if ( !bus->wireWriteAndRead( 0xBE, 9*8, data ) ) return false;
 
-    ESP_LOG_BUFFER_HEX_LEVEL( TAG, &scratchpad, 9 , ESP_LOG_VERBOSE );
-	//printf( "\nRS\n\t%02X %02X %02X %02X\n", data.data()[0], data.data()[1], data.data()[8],data.data()[9] );
+    printf( "Data 5 %d \n", data[5] );
+    scratchpad.copy(data);
 
     ESP_LOGD( TAG, "::read_scratchpad - End" );
-    return true;    // in 0.0625C increments
+    return true;  
 }    // read_scratchpad
 
 
-// // TODO
-// bool DS18B20::write_scratchpad( OneWireBus* bus )
-// {
-//     ESP_LOGD( TAG, "::write_scratchpad - Start" );
-//     ESP_LOGD( TAG, "::write_scratchpad - End" );
-//     return true;    // in 0.0625C increments
-// }    // write_scratchpad
+
+bool DS18B20::cmd_write_scratchpad( OneWireBus* bus, uint8_t th, uint8_t tl, uint8_t config )
+{
+    ESP_LOGD( TAG, "::write_scratchpad" );
+
+    onewire_data_t data { 0x4E, th, tl, config };
+    return bus->wireWriteAndRead( data, 0, data );
+
+}    // write_scratchpad
 
 
-// // TODO
-// bool DS18B20::copy_scratchpad( OneWireBus* bus )
-// {
-//     ESP_LOGD( TAG, "::copy_scratchpad - Start" );
-//     ESP_LOGD( TAG, "::copy_scratchpad - End" );
-//     return true;    // in 0.0625C increments
-// }    // copy_scratchpad
+
+bool DS18B20::copy_scratchpad( OneWireBus* bus )
+{
+    ESP_LOGD( TAG, "::copy_scratchpad" );
+
+    return  ( bus->wireWrite( 0x4E ) &&  bus->wireReadUntilOne(32) );
+
+}    // copy_scratchpad
 
 
-// // TODO
-// bool DS18B20::recall_e2( OneWireBus* bus )
-// {
-//     ESP_LOGD( TAG, "::recall_e2 - Start" );
-//     ESP_LOGD( TAG, "::recall_e2 - End" );
-//     return true;    // in 0.0625C increments
-// }    // recall_e2
+bool DS18B20::recall_e2( OneWireBus* bus )
+{
+    ESP_LOGD( TAG, "::copy_scratchpad" );
+
+    return  ( bus->wireWrite( 0xB8 ) &&  bus->wireReadUntilOne(32) );
+
+}    // recall_e2
 
 
-// /*
-//  * Start with unknown power state and determine bus or parasitic
-//  */
-// DS18B20::PWR_SRC DS18B20::read_power_supply( OneWireBus* bus )
-// {
-//     static onewire_data_t ReadPowerSupply = { 0xB4 };
 
-//     ESP_LOGD( TAG, "::read_power_supply - Start" );
+/*
+ * Start with unknown power state and determine bus or parasitic
+ */
+PWR_SPLY DS18B20::cmd_read_power_supply( OneWireBus* bus )
+{
+    ESP_LOGD( TAG, "::read_power_supply - Start" );
 
-//     onewire_data_t data { 0 };
-//     PWR_SRC result { PWR_SRC::UNKNOWN };
+    onewire_data_t data { 0 };
+    PWR_SPLY result { PWR_SPLY::UNKNOWN };
 
-//     if ( bus->writeAndRead( ReadPowerSupply, 1, data ) )
-//     {
-//         result = PWR_SRC::BUS;
-//         if ( data [ 0 ] == 0 ) result = PWR_SRC::PARASITIC;
-//     }
+    if ( bus->wireWriteAndRead( 0xB4, 1, data ) )
+    {
+        result = PWR_SPLY::BUS;
+        if ( data [ 0 ] == 0 ) result = PWR_SPLY::PARASITIC;
+    }
 
-//     ESP_LOGD( TAG, "::read_power_supply - End" );
-//     return result;
-// }    // read_power_supply
+    ESP_LOGD( TAG, "::read_power_supply - End" );
+    return result;
+}    // read_power_supply

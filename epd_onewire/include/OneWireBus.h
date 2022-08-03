@@ -26,8 +26,16 @@
 #define EPD_ONEWIREBUS_H_
 
 
+/*  Define OW_THREADSAFE to enable threadsafe operation */
 //#define OW_THREADSAFE 
 #undef OW_THREADSAFE 
+
+
+
+/*  Define OW_PARASITIC to incorporate parasitic power management operations */
+//#define OW_PARASITIC 
+#undef OW_PARASITIC 
+
 
 /* One Wire Over-Drive Timings in Micro Seconds (US) */
 /* Timings from https://pdfserv.maximintegrated.com/en/an/AN126.pdf */
@@ -132,30 +140,7 @@ namespace epd
      */
     using onewire_rom_code_t = uint64_t;
 
- 
 
-    /**
-     * @brief OneWireBus power source
-     * 
-     */
-    enum ADAPTIVE_TIMING
-    {
-        NONE, 
-        READ, 
-        WRITE,
-        READ_WRITE,
-    };
-    
-    /**
-     * @brief OneWireBus status
-     * 
-     */
-    enum STATUS
-    {
-        UNKNOWN, 
-        RESET, 
-        ADDRESSED,
-    };
 
     /**
      * @class OneWireBus
@@ -171,29 +156,51 @@ namespace epd
         public:
 
             /**
-             * @brief OneWire 
+             * @enum OneWireBus power source
              * 
              */
-            enum PWR_SRC
+            
+            enum ADAPTIVE_TIMING
             {
-                UNKNOWN, 
-                BUS, 
-                PARASITIC,
+                NONE = 0,               //!< Standard timings
+                READ = 1,               //!< Adapt slot reads
+                WRITE = 2,              //!< Adapt slot writes
+                READ_WRITE = 3,         //!< Adapt slot reads and writes
+            };
+            
+            
+            /**
+             * @enum OneWireBus status
+             * 
+             */
+            enum STATUS
+            {
+                UNRESET = 0,            //!< Bus requires a reset before any new command can be sent
+                RESET = 1,              //!< Bus is reset and awaiting a command
+                ADDRESSED = 2,          //!< Bus has had devices addressed
             };
 
 
-            /*
-             * Constant Values
+            /**
+             * @enum PWR_SPLY
+             * 
+             * @brief OneWire 
+             * 
              */
-            const onewire_data_t OW_DATA_ZERO { 0 };
-            const onewire_data_t OW_DATA_ONE { 1 };
+            enum PWR_SPLY
+            {
+                UNKNOWN = 0,            //!< Device power ssupplyource unknown
+                BUS = 1,                //!< Bus powered devices only
+                PARASITIC = 2,          //!< One or more parasiticly powered devices
+            };
+
 
             /**
-             * @enum unmarshal_behavior_t
+             * @enum UNMARSHAL_BEHAVIOR
              *
              * @brief brief description to handle unmarshalling when first pulse is high
              */
-            enum unmarshal_behavior_t
+            enum UNMARSHAL_BEHAVIOR
             {
                 FAIL,                   //!< FAIL
                 DISCARD_HIGH,           //!< DISCARD_HIGH Discard the first high pulse
@@ -274,6 +281,8 @@ namespace epd
 
             /**
              * @brief Initialize the bus for operation
+             * 
+             * @return true is initialization was successful
              */
             bool initialize();
 
@@ -297,7 +306,7 @@ namespace epd
              *
              * @return true if reset and presence reponse seen
              */
-            virtual bool bus_reset();
+            virtual bool cmd_bus_reset();
 
 
             /**
@@ -309,7 +318,7 @@ namespace epd
              *
              * @return true if command sent
              */
-            virtual bool match_rom( uint64_t registration_code, bool autoreset = true );
+            virtual bool cmd_match_rom( const onewire_rom_code_t& rom_code, bool autoreset = true );
 
 
             /**
@@ -317,10 +326,10 @@ namespace epd
              *
              * Identify a device or determine if several devices are connected in parallel.
              *
-             * @param romcode the found romcode
+             * @param[out] romcode the found romcode
              * @return true if command issued
              */
-            virtual bool read_rom( onewire_rom_code_t& romcode, bool autoreset = true );
+            virtual bool cmd_read_rom( onewire_rom_code_t& romcode, bool autoreset = true );
 
 
             /**
@@ -333,7 +342,7 @@ namespace epd
              * @param search_state the state to search and returning state
              * @return true if the command was issued
              */
-            virtual bool search_rom( onewire_search_state_t& search_state, bool autoreset = true );
+            virtual bool cmd_search_rom( onewire_search_state_t& search_state, bool autoreset = true );
 
 
             /**
@@ -345,30 +354,109 @@ namespace epd
              * application usually requires all iButtons to be of the same type and to
              * be connected properly.
              */
-            virtual bool skip_rom( bool autoreset = true );
+            virtual bool cmd_skip_rom( bool autoreset = true );
 
 
-            /**
-             * @brief Issues a 1-Wire ROM Overdrive Match command for one device. Requires reset first.
-             *
-             * Address one specific iButton among several connected to the 1–Wire bus
-             * and set it into overdrive mode for subsequent communication at overdrive speed.
-             *
-             * @return
-             */
-            //  virtual bool overdrive_match_rom();
-            /**
-             * @brief Issues a 1-Wire rom skip command, to address all on bus.
-             *
-             * Set all overdrive–capable devices into overdrive mode and to subsequently
-             * broadcast data at overdrive speed.
-             */
-            //  virtual bool overdrive_skip_rom();
+            //virtual bool cmd_alarm_search( bool autoreset = true ); // TODO
 
 
             /* --------------------------------------------------------
              *
-             * Helper functions
+             * Command Wrapper functions
+             *
+             * --------------------------------------------------------
+             */
+            
+            /**
+             * @brief Attempt to guard the bus
+             * 
+             * @param xBlockTime time to wait for the guard
+             * @return true if the bus is guarder
+             * @return false if the bus guard failed
+             */
+            inline bool busGuard( TickType_t xBlockTime = portMAX_DELAY );
+
+            /**
+             * @brief Release the bus guard and set the bus state
+             * 
+             * The bus is either RESET (Bus Reset was last command),
+             * ADDRESSED (devices were selected with an addressing command),
+             * or UNRESET (not reset nor addressed).
+             * 
+             * @param busreset sets the bus state
+             */
+            inline void busRelease( STATUS state = STATUS::UNRESET );
+
+
+            /* --------------------------------------------------------
+             *
+             * Value Add Bus Commands
+             *
+             * --------------------------------------------------------
+             */
+
+            /**
+             * @brief Read the ROM Code of the single device attached to the bus
+             * 
+             * @return true if read completed.
+             */
+            virtual bool cmdReadRomCode();
+
+
+            /**
+             * @brief Search the bus for any attached devices and collates their ROM codes.
+             *
+             * Updates the object state.
+             * 
+             * @return true if scan completed.
+             */
+            virtual bool cmdSearchRomCodes();
+
+            
+            /**
+             * @brief Address the bus for the given device using the most efficient command
+             * 
+             * If the device is the only one on the bus, use Skip ROM, otherwise use Match ROM.
+             * 
+             * @param device the device ROM Code
+             * @return true the bus is addressed
+             */
+            virtual bool cmdAddressDevice( const onewire_rom_code_t& device );
+
+
+            /* --------------------------------------------------------
+             *
+             * Value Add Wire Operations
+             *
+             * --------------------------------------------------------
+             */
+
+            /**
+             * @brief Writes out byte (command) data and reads a given number of slots,
+             * returning the unmarshalled data.
+             * 
+             * @param to_wire data to be written to the bus
+             * @param bits_to_read read slots to read and unmarshal
+             * @param[out] from_wire data unmarshalled from the bus
+             * @return true if data written
+             */
+            virtual bool wireWriteAndRead( const onewire_data_t& to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
+            virtual bool wireWriteAndRead( uint8_t to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
+            virtual bool wireWrite( uint8_t to_wire );
+
+            /**
+             * @brief Reads bus every 100ms until a 1 is read
+             * 
+             * @param maxSlots manimum number of slots
+             * @return true 
+             * @return false 
+             */
+            virtual bool wireReadUntilOne( uint8_t maxSlots );
+
+
+            /* --------------------------------------------------------
+             *
+             * Bus State functions
              *
              * --------------------------------------------------------
              */
@@ -380,7 +468,26 @@ namespace epd
              */
             virtual bool getPresence();
 
+            /**
+             * @brief Has the bus been searched for all attached devices
+             * 
+             * @return true bus has been successfully searched
+             * @return false bus has not been successfully searched
+             */
+            virtual bool isSearched();
 
+            /**
+             * @brief Get the bus Status
+             * 
+             * The bus status is one of:
+             *  - Reset (where it is ready for a ROM command)
+             *  - Addressed (where devices have been addressed and are ready for a function command)
+             *  - Unknown (where the state is unknow or a function command has been issued)
+             * 
+             * @return STATUS the current status
+             */
+             STATUS getStatus();
+             
             /**
              * @brief adaptive shortest time to begin read
              * 
@@ -404,7 +511,7 @@ namespace epd
              * @see https://patents.google.com/patent/US5978927A/en
              * @todo Implement adaptive timing on a switch
              */
-            virtual uint16_t getAdaptiveFastestRead(); // TODO
+            virtual uint16_t getAdaptiveFastestRead(); 
 
 
             /**
@@ -426,7 +533,7 @@ namespace epd
              * @see https://patents.google.com/patent/US5978927A/en
              * @todo Implement adaptive timing on a switch
              */
-            virtual uint16_t getAdaptiveSlowestWrite(); // TODO
+            virtual uint16_t getAdaptiveSlowestWrite(); 
 
             /**
              * @brief Inspect or set adaptive timing use
@@ -437,19 +544,13 @@ namespace epd
              */
             virtual ADAPTIVE_TIMING useAdaptive( bool setadaptive = false, ADAPTIVE_TIMING timing = NONE );
 
-            /**
-             * @brief Search the bus for any attached devices and collates their ROM codes.
-             *
-             * @return true if scan completed.
-             */
-            virtual bool searchRomCodes();
 
             /**
-             * @brief Search the single device attached to the bus and gets its ROM code.
-             *
-             * @return ROM code, 0 if non found, 1 if error.
+             * @brief Get the nominal power supply for bus devices
+             * 
+             * @return PWR_SRC 
              */
-            virtual bool readRomCode();
+           // PWR_SPLY getPower();
 
 
             /**
@@ -460,50 +561,23 @@ namespace epd
             const virtual std::vector< uint64_t >& getRomCodes();
 
 
-            /**
-             * @brief Writes out byte (command) data and reads a given number of slots,
-             * returning the unmarshalled data.
-             * 
-             * @param to_wire data to be written to the bus
-             * @param bits_to_read read slots to read and unmarshal
-             * @param[out] from_wire data unmarshalled from the bus
-             * @return true if data written
-             */
-            virtual bool writeAndRead( onewire_data_t& to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
-            virtual bool writeAndRead( uint8_t to_wire, uint16_t bits_to_read, onewire_data_t& from_wire );
-            virtual bool write( uint8_t to_wire );
-
-            /**
-             * @brief Reads bus every 100ms until a 1 is read
-             * 
-             * @param maxSlots manimum number of slots
-             * @return true 
-             * @return false 
-             */
-            virtual bool readUntilOne( uint8_t maxSlots );
-
-
-            /**
-             * @brief Has the bus been searched for all attached devices
-             * 
-             * @return true bus has been successfully searched
-             * @return false bus has not been successfully searched
-             */
-            virtual bool isSearched();
-
-            /**
-             * @brief Get the bus Status
-             * 
-             * The bus status is one of:
-             *  - Reset (where it is ready for a ROM command)
-             *  - Addressed (where devices have been addressed and are ready for a function command)
-             *  - Unknown (where the state is unknow or a function command has been issued)
-             * 
-             * @return STATUS the current status
-             */
-             STATUS getStatus();
-
         protected:
+
+            /* --------------------------------------------------------
+             *
+             * Implementation
+             *
+             * --------------------------------------------------------
+             */
+
+            /**
+             * @brief Initialize the bus
+             * 
+             * Check for presence, devices and parasistic power use.
+             * 
+             * @return true if the bus was initialized
+             */
+            virtual bool _initialize( ) = 0;
 
             /**
              * @brief Implementation of 1Wire bus line level reset
@@ -516,18 +590,10 @@ namespace epd
              * (OW_RESET_TIME_US, or zero if the master is not captured). If the
              * master is captured, the adaptive timing is calculated.
              *
-             * @param pulses the pulse durations off the wire
+             * @param[out] pulses the pulse durations off the wire
              * @return true if the reset was sent
              */
             virtual bool _bus_reset( onewire_pulses_t& pulses ) = 0;
-
-
-            /**
-             * @brief Put a strong pull up on the bus for the given duration
-             * @param pullup_duration_us pullup duration in us
-             * @return true if transmitted
-             */
-            virtual bool _strong_pullup( uint8_t pullup_duration_us ) = 0;
 
 
             /**
@@ -574,7 +640,7 @@ namespace epd
              * the per-byte level.
              *
              * @param bits the number of bits to read
-             * @param data [in/out] the data converted from pulses off the wire
+             * @param[out] data the data converted from pulses off the wire
              * @return true if data retrieved
              */
             virtual bool _read_slots( uint16_t bits, onewire_data_t& data ) = 0;
@@ -586,7 +652,7 @@ namespace epd
              * This helper takes a raw pulse and encodes and incorporates it into the set of pulses.
              * It aggregates consecutive pulses with the same line level.
              *
-             * @param pulses the set of pulses being generated
+             * @param[out] pulses the set of pulses being generated
              * @param level_high true if pulse line high, or false for pulse line low
              * @param duration the duration in us of the pulse
              */
@@ -602,12 +668,21 @@ namespace epd
              * Starts on first low pulse.
              *
              * @param pulses the set of pulses off the wire
-             * @param data the unmarshalled data
+             * @param[out] data the unmarshalled data
              * @param behavior Behavior if first pulse is high
              * @return the number of bits that were unmarshalled
              */
-            uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, unmarshal_behavior_t behavior =
+            uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, UNMARSHAL_BEHAVIOR behavior =
                     FAIL );
+
+
+            /**
+             * @brief Put a strong pull up on the bus for the given duration
+             * @param pullup_duration_us pullup duration in us
+             * @return true if transmitted
+             */
+            virtual bool _strong_pullup( uint8_t pullup_duration_us ) = 0;
+
 
             /**
              * @brief Implement the adaptive timing
@@ -616,29 +691,35 @@ namespace epd
              */
             virtual void _set_adaptive_timing( ADAPTIVE_TIMING timing ) = 0;
 
-            /**
-             * @brief Initialize the bus
-             * 
-             */
-            virtual bool _initialize( ) = 0;
-
 
         private:
+
+            /*
+             * Constant Values
+             */
+            const onewire_data_t OW_DATA_ZERO { 0 };
+            const onewire_data_t OW_DATA_ONE { 1 };
 
 #ifdef OW_THREADSAFE
             const SemaphoreHandle_t m_aquire_bus_mutex { xSemaphoreCreateRecursiveMutex() };    // Coordinate commandeering the bus
 #endif
+
+            /*
+            *   Members
+            */
+            std::vector< onewire_rom_code_t > m_rom_codes;  // Known ROM Codes on this bus
             bool m_presence { false };                      // Presence pulse seen
             bool m_scanned { false };                       // Bus has been scanned for devices and devices are known
-            STATUS m_status { STATUS::UNKNOWN };            //!< Bus status
+            STATUS m_status { UNRESET };                    //!< Bus status
             uint16_t m_adaptive_fastest_read { 0 };         // From Tpdh, the fastest device, min time needed for read-slot
             uint16_t m_adaptive_slowest_write { 0 };        // (Tpdh+Tpdl)/5 -  the slowest device
             ADAPTIVE_TIMING m_adaptive_timing { NONE };     //
-
-            std::vector< onewire_rom_code_t > m_rom_codes;
+            //PWR_SRC m_power { UNKNOWN };                    // Nominal power supply of devices on the bus
 
             /**
              * @brief Check bus is reset/autoreset and guard the bus
+             * 
+             * For Bus level (network) commands that require a reset bus
              * 
              * @param autoreset reset the bus if not reset
              * @param xBlockTime time to wait for the guard
@@ -647,21 +728,6 @@ namespace epd
              */
             inline bool _bus_guard_and_reset( bool autoreset = true, TickType_t xBlockTime = portMAX_DELAY );
 
-            /**
-             * @brief Attempt to guard the bus
-             * 
-             * @param xBlockTime time to wait for the guard
-             * @return true if the bus is guarder
-             * @return false if the bus guard failed
-             */
-            inline bool _bus_guard( TickType_t xBlockTime = portMAX_DELAY );
-
-            /**
-             * @brief Release the bus guard and set the bus state
-             * 
-             * @param busreset sets the bus state
-             */
-            inline void _bus_release( STATUS state = STATUS::UNKNOWN );
 
     }; // OneWireBus
 

@@ -33,7 +33,7 @@
 
 #include "OneWireBus.h"
 
-using PWR_SRC = epd::OneWireBus::PWR_SRC;
+using PWR_SPLY = epd::OneWireBus::PWR_SPLY;
 
 namespace epd
 {
@@ -62,6 +62,7 @@ namespace epd
              * @return true if valid
              */
             static bool validate( onewire_rom_code_t reg );
+            static bool validate( uint8_t* regbytes, uint8_t bytes );
 
 
             /**
@@ -171,7 +172,7 @@ namespace epd
             uint8_t m_family;                               //!< Device family
             bool m_valid { false };                         //!< Device valid flag
             std::string m_info;                             //!< Device info
-            PWR_SRC m_power_supply { PWR_SRC::BUS };    //!< Device power supply
+            PWR_SPLY m_power_supply { PWR_SPLY::UNKNOWN };  //!< Device power supply
     };
 // OneWireDevice
 

@@ -109,6 +109,12 @@ namespace epd
         private:
 
             /**
+             * @brief Initialize the ESP32 peripherals ready for bus operations
+             */
+            bool _initialize();
+
+
+            /**
              * @see OneWireBus
              */
             bool _bus_reset( onewire_pulses_t& pulses );
@@ -149,21 +155,11 @@ namespace epd
 
 
             /**
-             * @brief Initialize the ESP32 peripherals ready for bus operations
-             */
-            bool _initialize();
-
-
-            /* --------------------------------------------------------------
-             * Implementation Specifics
-             * -------------------------------------------------------------- */
-
-            /**
              * @brief Probe the bus, returning pulse timings on the line
              *
              * Starts with first low pulse found.
              *
-             * @param [in/out] pulses the pointer for the returned data
+             * @param pulses the pointer for the returned data
              * @return the number of items returned
              */
             size_t _probe( onewire_pulses_t& pulses );

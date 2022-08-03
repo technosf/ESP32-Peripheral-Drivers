@@ -51,11 +51,11 @@ static const constexpr uint8_t CRC8_TABLE [ 256 ] {    //
 };
 
 
-bool OneWireDevice::validate( uint64_t reg )
+bool OneWireDevice::validate( uint8_t* regbytes, uint8_t bytes )
 {
-    uint8_t* regbytes = (uint8_t*) &reg;
     uint8_t crc { 0 };
-    for ( int i = 0; i < 7; i++ )
+    bytes--;
+    for ( int i = 0; i < bytes; i++ )
     /*
      * Generate the 8-bit CRC
      */
@@ -65,15 +65,40 @@ bool OneWireDevice::validate( uint64_t reg )
         crc = CRC8_TABLE [ crc ^ regbytes [ i ] ];
     }
 
-    ESP_LOGV( TAG, "::OneWireDevice - Device CRC - Expected 0x%02X  Got 0x%02X  Valid %d", regbytes [ 7 ], crc,
-            ( regbytes [ 7 ] == crc ) );
+    ESP_LOGV( TAG, "::OneWireDevice - Device CRC - Expected 0x%02X  Got 0x%02X  Valid %d", regbytes [ bytes ], crc,
+            ( regbytes [ bytes ] == crc ) );
 
-    return ( regbytes [ 7 ] == crc );    // Do the reg code crc and calculated CRCs match
+    return ( regbytes [ bytes ] == crc );    // Do the reg code crc and calculated CRCs match
 
 }    // validate
 
+bool OneWireDevice::validate( onewire_rom_code_t reg )
+{
+    return validate( (uint8_t*) &reg, 8 );
+}    // validate
+// bool OneWireDevice::validate( onewire_rom_code_t reg )
+// {
+//     uint8_t* regbytes = (uint8_t*) &reg;
+//     uint8_t crc { 0 };
+//     for ( int i = 0; i < 7; i++ )
+//     /*
+//      * Generate the 8-bit CRC
+//      */
+//     {
+//         ESP_LOGV( TAG, "::OneWireDevice - CRC : Byte %d   In 0x%02X   Old CRC 0x%02X   Index 0x%02X   New CRC 0x%02X",
+//                 i, regbytes [ i ], crc, regbytes [ i ] ^ crc, CRC8_TABLE [ regbytes [ i ] ^ crc ] );
+//         crc = CRC8_TABLE [ crc ^ regbytes [ i ] ];
+//     }
 
-uint8_t OneWireDevice::family( uint64_t reg )
+//     ESP_LOGV( TAG, "::OneWireDevice - Device CRC - Expected 0x%02X  Got 0x%02X  Valid %d", regbytes [ 7 ], crc,
+//             ( regbytes [ 7 ] == crc ) );
+
+//     return ( regbytes [ 7 ] == crc );    // Do the reg code crc and calculated CRCs match
+
+// }    // validate
+
+
+uint8_t OneWireDevice::family( onewire_rom_code_t reg )
 {
     return ( (uint8_t*) &reg ) [ 0 ];
 }    // family
@@ -98,6 +123,7 @@ m_rom_code { rom_code }
             regbytes [ 2 ], regbytes [ 3 ], regbytes [ 4 ], regbytes [ 5 ], regbytes [ 6 ], m_crc,
             ( m_valid ? "Valid" : "Invalid" ) );
     m_info.assign(info);
+
     ESP_LOGD( TAG, "::OneWireDevice - Set info: %s", info );
 } // OneWireDevice
 
@@ -147,9 +173,11 @@ bool OneWireDevice::isValid()
 
 epd::OneWireBus* OneWireDevice::isBusAttached(epd::OneWireBus* bus, bool clearBus)
 {
+    ESP_LOGD( TAG, "::isBusAttached - Start" );
+
     if ( !bus ) return m_one_wire_bus;
 
-    if ( !bus->isSearched() || !bus->searchRomCodes() ) 
+    if ( !bus->isSearched() || !bus->cmdSearchRomCodes() ) 
     // Bus not scanned, or requested to be cl
         return nullptr;
     
@@ -162,13 +190,14 @@ epd::OneWireBus* OneWireDevice::isBusAttached(epd::OneWireBus* bus, bool clearBu
 
     // TODO skip rom parasitic
         
+    ESP_LOGD( TAG, "::isBusAttached - End" );
     return m_one_wire_bus;
 } // isBusAttached
 
 
 bool OneWireDevice::isParasitic()
 {
-    return ( m_power_supply == PWR_SRC::PARASITIC );
+    return ( m_power_supply == PWR_SPLY::PARASITIC );
 }
 
 
