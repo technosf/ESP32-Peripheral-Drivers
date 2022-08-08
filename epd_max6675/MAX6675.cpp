@@ -32,6 +32,7 @@
 using namespace epd;
 
 
+
 MAX6675::MAX6675(spi_host_device_t SPI_HOST_DEVICE, int8_t CS, int8_t CLK, int8_t MISO) :
     MAX6675( SPI_HOST_DEVICE, static_cast< gpio_num_t >( CS ), static_cast< gpio_num_t >( CLK ), static_cast< gpio_num_t >( MISO ) )
 {

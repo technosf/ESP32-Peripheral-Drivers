@@ -1,4 +1,4 @@
-    /**
+/**
  *  @file       OneWireDevice.cpp
  *  @version    0.1.0
  *
@@ -104,8 +104,7 @@ uint8_t OneWireDevice::family( onewire_rom_code_t reg )
 }    // family
 
 
-OneWireDevice::OneWireDevice( onewire_rom_code_t rom_code ) :
-m_rom_code { rom_code }
+OneWireDevice::OneWireDevice( onewire_rom_code_t rom_code ) : m_rom_code { rom_code }
 {
     ESP_LOGD( TAG, "::OneWireDevice - New device" );
 
@@ -177,7 +176,7 @@ epd::OneWireBus* OneWireDevice::isBusAttached(epd::OneWireBus* bus, bool clearBu
 
     if ( !bus ) return m_one_wire_bus;
 
-    if ( !bus->isSearched() || !bus->cmdSearchRomCodes() ) 
+    if ( !bus->isSearched() || !bus->cmdSearchRom() ) 
     // Bus not scanned, or requested to be cl
         return nullptr;
     
@@ -193,19 +192,4 @@ epd::OneWireBus* OneWireDevice::isBusAttached(epd::OneWireBus* bus, bool clearBu
     ESP_LOGD( TAG, "::isBusAttached - End" );
     return m_one_wire_bus;
 } // isBusAttached
-
-
-bool OneWireDevice::isParasitic()
-{
-    return ( m_power_supply == PWR_SPLY::PARASITIC );
-}
-
-
-
-/* --------------------------------------------------------
-*
-* One Wire Network Layer common Device Commands
-*
-* --------------------------------------------------------
-*/
 

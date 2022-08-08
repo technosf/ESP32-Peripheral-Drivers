@@ -28,11 +28,16 @@
 using namespace epd;
 
 
-bool OneWireBus::initialize()
+bool OneWireBus::initialize( bool search )
 {
-    if ( _initialize() ) return cmdSearchRomCodes();
+    if ( _initialize() 
+        && (    !search 
+                || cmdSearchRom() 
+        ) 
+    ) return true;
     return false;
 }
+
 
 /* --------------------------------------------------------
 *
@@ -45,13 +50,13 @@ bool OneWireBus::cmd_bus_reset()
 {    
     if ( !busGuard() ) return false;
 
-    ESP_LOGD( TAG, "::bus_reset - Start" );
+    ESP_LOGD( TAG, "::cmd_bus_reset - Start" );
 
     m_presence = false;
     onewire_pulses_t pulses;
     bool reset { _bus_reset( pulses ) };
 
-    ESP_LOGD( TAG, "::bus_reset - Pulses: %d ( expecting 4 )", pulses.size() );
+    ESP_LOGD( TAG, "::cmd_bus_reset - Pulses: %d ( expecting 4 )", pulses.size() );
     if ( reset && pulses.size() > 0 )
     /*
      * Examine pulses. Optionally may start with the presence pulse.
@@ -84,24 +89,24 @@ bool OneWireBus::cmd_bus_reset()
                 m_adaptive_fastest_read = -pulses [ 1 ];  // Tpdh (Pin is high, so represented as a -ve value in pulses)
                 m_adaptive_slowest_write = ( m_adaptive_fastest_read + pulses [ 2 ] ) / 5;
                 if ( NONE != m_adaptive_timing )_set_adaptive_timing( m_adaptive_timing );
-                ESP_LOGD( TAG, "::bus_reset - Adaptive timing fastest-read/Tpdh: %u, Tpdl: %u  slowest write: %u", m_adaptive_fastest_read, pulses [ 2 ], m_adaptive_slowest_write );
+                ESP_LOGD( TAG, "::cmd_bus_reset - Adaptive timing fastest-read/Tpdh: %u, Tpdl: %u  slowest write: %u", m_adaptive_fastest_read, pulses [ 2 ], m_adaptive_slowest_write );
             }
         }
     }
 
     busRelease( STATUS::RESET );
 
-    ESP_LOGD( TAG, "::bus_reset - End. Presence: %d", m_presence );
+    ESP_LOGD( TAG, "::cmd_bus_reset - End. Presence: %d", m_presence );
 
     return m_presence;
-}    // bus_reset
+}    // cmd_bus_reset
 
 
 bool OneWireBus::cmd_match_rom( const onewire_rom_code_t& address, bool autoreset )
 {
     if ( !_bus_guard_and_reset() ) return false;
 
-    ESP_LOGD( TAG, "::match_rom - Start" );
+    ESP_LOGD( TAG, "::cmd_match_rom - Start" );
 
     onewire_data_t cmd = { 0x55 };
     cmd.insert( cmd.end(), address );
@@ -112,17 +117,17 @@ bool OneWireBus::cmd_match_rom( const onewire_rom_code_t& address, bool autorese
 
     busRelease( STATUS::ADDRESSED );
 
-    ESP_LOGD( TAG, "::match_rom - End" );
+    ESP_LOGD( TAG, "::cmd_match_rom - End" );
 
     return true;
-}    // match_rom
+}    // cmd_match_rom
 
 
 bool OneWireBus::cmd_read_rom( onewire_rom_code_t& romcode, bool autoreset )
 {
     if ( !_bus_guard_and_reset() ) return false;
 
-    ESP_LOGD( TAG, "::read_rom - Start" );
+    ESP_LOGD( TAG, "::cmd_read_rom - Start" );
 
     onewire_data_t data;
 
@@ -137,19 +142,69 @@ bool OneWireBus::cmd_read_rom( onewire_rom_code_t& romcode, bool autoreset )
 
     busRelease( STATUS::ADDRESSED );
 
-    ESP_LOGD( TAG, "::read_rom - End" );
+    ESP_LOGD( TAG, "::cmd_read_rom - End" );
 
     return true;
-}    // read_rom
+}    // cmd_read_rom
 
 
 bool OneWireBus::cmd_search_rom( onewire_search_state_t& search_state, bool autoreset )
 {
-    static onewire_data_t cmd = { 0xF0 };
+    ESP_LOGD( TAG, "::search_rom" );
+    return busSearch( 0xF0, search_state, autoreset );
+}    // cmd_search_rom
 
+
+bool OneWireBus::cmd_skip_rom( bool autoreset )
+{
     if ( !_bus_guard_and_reset( autoreset ) ) return false;
 
-    ESP_LOGD( TAG, "::search_rom - Start" );
+    ESP_LOGD( TAG, "::cmd_skip_rom - Start" );
+
+    _write_slots( static_cast<uint8_t>(0xCC) );
+
+    busRelease( STATUS::ADDRESSED );
+
+    ESP_LOGD( TAG, "::cmd_skip_rom - End" );
+
+    return true;
+}    // cmd_skip_rom
+
+
+
+
+/* --------------------------------------------------------
+*
+* Command Helper functions
+*
+* --------------------------------------------------------
+*/
+
+inline bool OneWireBus::busGuard( TickType_t xBlockTime) 
+{ 
+#ifdef OW_THREADSAFE
+    return  ( xSemaphoreTakeRecursive(m_aquire_bus_mutex, xBlockTime) == pdTRUE ); 
+#else
+    return true;
+#endif
+};
+
+
+inline void OneWireBus::busRelease( STATUS state )
+{
+    m_status = state;
+
+#ifdef OW_THREADSAFE
+    xSemaphoreGiveRecursive( m_aquire_bus_mutex );
+#endif
+}
+
+
+bool OneWireBus::busSearch( uint8_t cmd, OneWireBus::onewire_search_state_t& search_state, bool autoreset )
+{
+    if ( !_bus_guard_and_reset( autoreset ) ) return false;
+
+    ESP_LOGD( TAG, "::busSearch - Start" );
 
     onewire_data_t data { 0 };
     uint8_t id_bit_number { 1 }, last_zero { 0 }, rom_byte_mask { 1 }, rom_byte_number { 0 };
@@ -171,7 +226,7 @@ bool OneWireBus::cmd_search_rom( onewire_search_state_t& search_state, bool auto
          * No devices on the bus, break out of the loop
          */
         {
-            ESP_LOGW( TAG, "::search_rom - No devices found on bus %s = %d", info(), data [ 0 ] );
+            ESP_LOGW( TAG, "::busSearch - No devices found on bus %s = %d", info(), data [ 0 ] );
             search_state.LastDeviceFlag = true;
             break;
         }
@@ -251,7 +306,7 @@ bool OneWireBus::cmd_search_rom( onewire_search_state_t& search_state, bool auto
             rom_byte_mask = 1;
         }
 
-        ESP_LOGV( TAG, "::search_rom - Search direction: %d", search_direction );
+        ESP_LOGV( TAG, "::busSearch - Search direction: %d", search_direction );
         data [ 0 ] = 0;
         _write_slots( search_direction );    // serial number search direction write bit
     }
@@ -265,7 +320,7 @@ bool OneWireBus::cmd_search_rom( onewire_search_state_t& search_state, bool auto
      * and check for last device
      */
     {
-        ESP_LOGD( TAG, "::search_rom - Found device" );
+        ESP_LOGD( TAG, "::busSearch - Found device" );
         ESP_LOG_BUFFER_HEX_LEVEL( TAG, &search_state.ROM_NO, 8, ESP_LOG_DEBUG );
         search_state.LastDiscrepancy = last_zero;
         if ( search_state.LastDiscrepancy == 0 ) search_state.LastDeviceFlag = true;
@@ -274,67 +329,22 @@ bool OneWireBus::cmd_search_rom( onewire_search_state_t& search_state, bool auto
 
     busRelease( STATUS::ADDRESSED );
 
-    ESP_LOGD( TAG, "::search_rom - End" );
+    ESP_LOGD( TAG, "::busSearch - End" );
 
     return true;
 
-}    // search_rom
-
-
-bool OneWireBus::cmd_skip_rom( bool autoreset )
-{
-    if ( !_bus_guard_and_reset( autoreset ) ) return false;
-
-    ESP_LOGD( TAG, "::skip_rom - Start" );
-
-    _write_slots( static_cast<uint8_t>(0xCC) );
-
-    busRelease( STATUS::ADDRESSED );
-
-    ESP_LOGD( TAG, "::skip_rom - End" );
-
-    return true;
-}    // skip_rom
-
+}    // busSearch
 
 
 /* --------------------------------------------------------
 *
-* Command Wrapper functions
+* Value Added Bus Commands
 *
 * --------------------------------------------------------
 */
 
 
-inline bool OneWireBus::busGuard( TickType_t xBlockTime) 
-{ 
-#ifdef OW_THREADSAFE
-    return  ( xSemaphoreTakeRecursive(m_aquire_bus_mutex, xBlockTime) == pdTRUE ); 
-#else
-    return true;
-#endif
-};
-
-
-inline void OneWireBus::busRelease( STATUS state )
-{
-    m_status = state;
-
-#ifdef OW_THREADSAFE
-    xSemaphoreGiveRecursive( m_aquire_bus_mutex );
-#endif
-}
-
-
-/* --------------------------------------------------------
-*
-* Value Add Bus Commands
-*
-* --------------------------------------------------------
-*/
-
-
-bool OneWireBus::cmdReadRomCode()
+bool OneWireBus::cmdReadRom()
 {
     ESP_LOGD( TAG, "::readRomCode - Start\n\tBus %s", info() );
 
@@ -361,24 +371,24 @@ bool OneWireBus::cmdReadRomCode()
     ESP_LOGD( TAG, "::readRomCode - End");
 
     return result;
-}    // cmdReadRomCode
+}    // cmdReadRom
 
 
-bool OneWireBus::cmdSearchRomCodes()
+bool OneWireBus::cmdSearchRom()
 {
-    ESP_LOGD( TAG, "::cmdSearchRomCodes - Start\n\tBus %s", info() );
+    ESP_LOGD( TAG, "::cmdSearchRom - Start\n\tBus %s", info() );
 
-    std::vector< uint64_t > rom_codes;
+    std::vector< onewire_rom_code_t > rom_codes;
     OneWireBus::onewire_search_state_t search_point;
 
     do
     {
-        if ( !cmd_bus_reset() )
+        if ( !cmd_bus_reset() ) 
         /*
-         * No presence response from bus
+         * Poss first reset, so directly assess presence response from bus
          */
         {
-            ESP_LOGW( TAG, "::cmdSearchRomCodes - Reset Bus failed" );
+            ESP_LOGW( TAG, "::cmdSearchRom - Reset Bus failed" );
             return false;
         }
 
@@ -387,7 +397,7 @@ bool OneWireBus::cmdSearchRomCodes()
          * Search ROM command failed, note failure, go to next bus
          */
         {
-            ESP_LOGD( TAG, "::cmdSearchRomCodes - Search ROM failed" );
+            ESP_LOGD( TAG, "::cmdSearchRom - Search ROM failed" );
             return false;
         }
 
@@ -399,10 +409,10 @@ bool OneWireBus::cmdSearchRomCodes()
 
     m_scanned = true;
 
-    ESP_LOGD( TAG, "::cmdSearchRomCodes - End\n\tBus type: %s   Found %d devices.", info(), m_rom_codes.size() );
+    ESP_LOGD( TAG, "::cmdSearchRom - End\n\tBus type: %s   Found %d devices.", info(), m_rom_codes.size() );
 
     return true;
-} // cmdSearchRomCodes
+} // cmdSearchRom
 
 
 bool OneWireBus::cmdAddressDevice( const onewire_rom_code_t& device_rom_code )
@@ -431,7 +441,7 @@ bool OneWireBus::cmdAddressDevice( const onewire_rom_code_t& device_rom_code )
 
 /* --------------------------------------------------------
 *
-* Value Add Wire Operations
+* Value Added Wire Operations
 *
 * --------------------------------------------------------
 */
@@ -440,6 +450,7 @@ bool OneWireBus::cmdAddressDevice( const onewire_rom_code_t& device_rom_code )
 bool OneWireBus::wireWriteAndRead( const onewire_data_t& to_wire, uint16_t bits_to_read, onewire_data_t& from_wire )
 {
     ESP_LOGD( TAG, "::wireWriteAndRead - onewire_data_t" );
+
     bool result { _write_slots( to_wire ) };
     if ( result && bits_to_read ) return _read_slots( bits_to_read, from_wire );
     return result;
@@ -449,6 +460,7 @@ bool OneWireBus::wireWriteAndRead( const onewire_data_t& to_wire, uint16_t bits_
 bool OneWireBus::wireWriteAndRead( uint8_t to_wire, uint16_t bits_to_read, onewire_data_t& from_wire )
 {
     ESP_LOGD( TAG, "::wireWriteAndRead - uint8_t" );
+
     bool result { _write_slots( to_wire ) };
     if ( result && bits_to_read ) return _read_slots( bits_to_read, from_wire );
     return result;
@@ -458,6 +470,7 @@ bool OneWireBus::wireWriteAndRead( uint8_t to_wire, uint16_t bits_to_read, onewi
 bool OneWireBus::wireWrite( uint8_t to_wire )
 {
     ESP_LOGD( TAG, "::write - to_wire: %u",to_wire);
+
     return _write_slots( to_wire );
 } // wireWrite
 
@@ -466,9 +479,9 @@ bool OneWireBus::wireReadUntilOne( uint8_t maxSlots )
 {
     ESP_LOGD( TAG, "::wireReadUntilOne" );
     
-    onewire_data_t data;
+    static onewire_data_t data(1);
 
-    for ( uint8_t i = 0; i < maxSlots; i++ )
+    for ( uint8_t i = 0; i <= maxSlots; i++ )
     {
         if ( _read_slots( 1, data ) && data.front() == 1 ) return true;
 	    vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -515,14 +528,7 @@ OneWireBus::ADAPTIVE_TIMING OneWireBus::useAdaptive( bool setadaptive, ADAPTIVE_
 } // useAdaptive
 
 
-// OneWireBus::PWR_SPLY OneWireBus::getPower()
-// {
-//     return m_power;
-// }
-
-
-
-const std::vector< uint64_t >& OneWireBus::getRomCodes()
+const std::vector< onewire_rom_code_t >& OneWireBus::getRomCodes()
 {
     return m_rom_codes;
 } // getRegistrationCodes
@@ -543,7 +549,7 @@ epd::OneWireBus::STATUS OneWireBus::getStatus()
 
 /* --------------------------------------------------------
 *
-* Implementation
+* Implementations
 *
 * --------------------------------------------------------
 */
@@ -591,10 +597,6 @@ void OneWireBus::_process_pulse( onewire_pulses_t& pulses, bool level_high, uint
 
 uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, UNMARSHAL_BEHAVIOR behavior )
 {
-
-   // ESP_LOG_BUFFER_HEX_LEVEL( TAG, &pulses, pulses.size(),ESP_LOG_VERBOSE);
-    //ESP_LOG_BUFFER_HEX_LEVEL( TAG, &data, data.size(),ESP_LOG_VERBOSE);
-
     if ( pulses [ 0 ] < 0 )
     /*
      * First pulse is line high.
@@ -609,6 +611,7 @@ uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t
                 ESP_LOGW( TAG, "::_unmarshal_pulses - Discarding first pulse - High." );
                 pulses.erase( pulses.begin() );
                 break;
+
             case MAKE_ZERO:
                 /*
                  * Insert nominal low vale, meaning the pulse will read as a zero
@@ -616,6 +619,7 @@ uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t
                 ESP_LOGW( TAG, "::_unmarshal_pulses - Augmenting to 0 - first pulse High." );
                 pulses.insert( pulses.begin(), OW_READ_SLOT_LOW_US );
                 break;
+
             case MAKE_ONE:
                 /*
                  * Insert read low vale, meaning the pulse will read as a one
@@ -623,7 +627,9 @@ uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t
                 ESP_LOGW( TAG, "::_unmarshal_pulses - Augmenting to 1 - first pulse High." );
                 pulses.insert( pulses.begin(), OW_READ_DATA_US );
                 break;
+
             case FAIL:
+
             default:
                 ESP_LOGE( TAG, "::_unmarshal_pulses - Failing on first pulse High." );
                 return 0;
@@ -683,14 +689,9 @@ uint16_t OneWireBus::_unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t
 
 
 /* -----------------------------------------------------------------------------
- * Helpers
- * -----------------------------------------------------------------------------
- */
-
-
-
-/* -----------------------------------------------------------------------------
+ *
  * Private
+ * 
  * -----------------------------------------------------------------------------
  */
 
@@ -706,5 +707,57 @@ inline bool OneWireBus::_bus_guard_and_reset( bool autoreset, TickType_t xBlockT
 #else
             && true;
 #endif             
-};
+}
+
+
+
+/* -----------------------------------------------------------------------------
+ *
+ * onewire_search_state_t
+ *
+ * -----------------------------------------------------------------------------
+ */
+
+OneWireBus::onewire_search_state_t::onewire_search_state_t()
+{
+}
+
+/**
+ * @struct onewire_search_state_t
+ * 
+ * @brief Primes state to search from a given registration code
+ * 
+ * @param registration_code
+ */
+OneWireBus::onewire_search_state_t::onewire_search_state_t( onewire_rom_code_t registration_code )
+{
+    *(onewire_rom_code_t*) ROM_NO = registration_code;
+    LastDiscrepancy = 64;
+    found = false;
+}
+
+onewire_rom_code_t OneWireBus::onewire_search_state_t::getRegistrationCode()
+{
+    return *(onewire_rom_code_t*) ROM_NO;
+}
+
+void OneWireBus::onewire_search_state_t::reset()
+{
+    ROM_NO [ 8 ] = 0;
+    LastDiscrepancy = 0;
+    LastFamilyDiscrepancy = 0;
+    LastDeviceFlag = false;
+    found = false;
+}
+
+/**
+ * @brief Creates a copy of current state
+ * 
+ * @return
+ */
+OneWireBus::onewire_search_state_t OneWireBus::onewire_search_state_t::copy()
+{
+    onewire_search_state_t copy( getRegistrationCode() );
+    return copy;
+}
 

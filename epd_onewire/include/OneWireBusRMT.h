@@ -1,6 +1,6 @@
 /**
  *  @file       OneWireBusRMT.h
- *  @version    0.1.0
+ *  @version    0.4.3
  *
  *  @brief      ESP32 RMT implementation of Dallas 1-Wire Bus protocol driver
  *

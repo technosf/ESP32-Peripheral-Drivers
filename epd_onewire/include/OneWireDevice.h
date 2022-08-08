@@ -33,7 +33,6 @@
 
 #include "OneWireBus.h"
 
-using PWR_SPLY = epd::OneWireBus::PWR_SPLY;
 
 namespace epd
 {
@@ -149,17 +148,6 @@ namespace epd
              */
             epd::OneWireBus* isBusAttached(epd::OneWireBus* bus = nullptr, bool clearBus = false );
 
-
-            /**
-             * @brief Is this device using parasitic power
-             * 
-             * Enquires on the bus if not known
-             * 
-             * @return true 
-             * @return false 
-             */
-            bool isParasitic();
-
         protected:
 
             OneWireBus* m_one_wire_bus { nullptr };         //!< OneWireBus the device is attached to, if known
@@ -172,7 +160,6 @@ namespace epd
             uint8_t m_family;                               //!< Device family
             bool m_valid { false };                         //!< Device valid flag
             std::string m_info;                             //!< Device info
-            PWR_SPLY m_power_supply { PWR_SPLY::UNKNOWN };  //!< Device power supply
     };
 // OneWireDevice
 

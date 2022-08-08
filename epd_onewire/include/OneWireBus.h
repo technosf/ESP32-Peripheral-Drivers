@@ -135,7 +135,7 @@ namespace epd
      * @typedef onewire_rom_code_t
      * @ingroup epd
      * 
-     * @brief ROM COde datatype
+     * @brief ROM Code datatype
      * 
      */
     using onewire_rom_code_t = uint64_t;
@@ -182,20 +182,6 @@ namespace epd
 
 
             /**
-             * @enum PWR_SPLY
-             * 
-             * @brief OneWire 
-             * 
-             */
-            enum PWR_SPLY
-            {
-                UNKNOWN = 0,            //!< Device power ssupplyource unknown
-                BUS = 1,                //!< Bus powered devices only
-                PARASITIC = 2,          //!< One or more parasiticly powered devices
-            };
-
-
-            /**
              * @enum UNMARSHAL_BEHAVIOR
              *
              * @brief brief description to handle unmarshalling when first pulse is high
@@ -221,9 +207,7 @@ namespace epd
                     bool LastDeviceFlag { false };
                     bool found { false };
 
-                    onewire_search_state_t()
-                    {
-                    }
+                    onewire_search_state_t();
 
                     /**
                      * @struct onewire_search_state_t
@@ -232,37 +216,18 @@ namespace epd
                      * 
                      * @param registration_code
                      */
-                    onewire_search_state_t( uint64_t registration_code )
-                    {
-                        *(uint64_t*) ROM_NO = registration_code;
-                        LastDiscrepancy = 64;
-                        found = false;
-                    }
+                    onewire_search_state_t( onewire_rom_code_t registration_code );
 
-                    uint64_t getRegistrationCode()
-                    {
-                        return *(uint64_t*) ROM_NO;
-                    }
+                    onewire_rom_code_t getRegistrationCode();
 
-                    void reset()
-                    {
-                        ROM_NO [ 8 ] = 0;
-                        LastDiscrepancy = 0;
-                        LastFamilyDiscrepancy = 0;
-                        LastDeviceFlag = false;
-                        found = false;
-                    }
+                    void reset();
 
                     /**
                      * @brief Creates a copy of current state
                      * 
                      * @return
                      */
-                    onewire_search_state_t copy()
-                    {
-                        onewire_search_state_t copy( getRegistrationCode() );
-                        return copy;
-                    }
+                    onewire_search_state_t copy();
             };
 
             /**
@@ -282,9 +247,11 @@ namespace epd
             /**
              * @brief Initialize the bus for operation
              * 
+             * Do wire initialization, search for ROM codes
+             * 
              * @return true is initialization was successful
              */
-            bool initialize();
+            bool initialize( bool search = true );
 
 
             /* --------------------------------------------------------
@@ -340,6 +307,7 @@ namespace epd
              * and returns when a device, or no more devices are found.
              *
              * @param search_state the state to search and returning state
+             * @param autoreset Allows bus reset to bypassed
              * @return true if the command was issued
              */
             virtual bool cmd_search_rom( onewire_search_state_t& search_state, bool autoreset = true );
@@ -355,9 +323,6 @@ namespace epd
              * be connected properly.
              */
             virtual bool cmd_skip_rom( bool autoreset = true );
-
-
-            //virtual bool cmd_alarm_search( bool autoreset = true ); // TODO
 
 
             /* --------------------------------------------------------
@@ -387,6 +352,16 @@ namespace epd
              */
             inline void busRelease( STATUS state = STATUS::UNRESET );
 
+            /**
+             * @brief 
+             * 
+             * @param cmd 
+             * @param search_state 
+             * @param autoreset 
+             * @return true 
+             * @return false 
+             */
+            bool busSearch( uint8_t cmd, OneWireBus::onewire_search_state_t& search_state, bool autoreset );
 
             /* --------------------------------------------------------
              *
@@ -400,7 +375,7 @@ namespace epd
              * 
              * @return true if read completed.
              */
-            virtual bool cmdReadRomCode();
+            virtual bool cmdReadRom();
 
 
             /**
@@ -410,7 +385,7 @@ namespace epd
              * 
              * @return true if scan completed.
              */
-            virtual bool cmdSearchRomCodes();
+            virtual bool cmdSearchRom();
 
             
             /**
@@ -546,19 +521,11 @@ namespace epd
 
 
             /**
-             * @brief Get the nominal power supply for bus devices
-             * 
-             * @return PWR_SRC 
-             */
-           // PWR_SPLY getPower();
-
-
-            /**
              * @brief Returns registration codes of known devices attached to the bus.
              * 
              * @return the registration codes
              */
-            const virtual std::vector< uint64_t >& getRomCodes();
+            const virtual std::vector< onewire_rom_code_t >& getRomCodes();
 
 
         protected:
@@ -656,7 +623,7 @@ namespace epd
              * @param level_high true if pulse line high, or false for pulse line low
              * @param duration the duration in us of the pulse
              */
-            void _process_pulse( onewire_pulses_t& pulses, bool level_high, uint16_t duration );
+            virtual void _process_pulse( onewire_pulses_t& pulses, bool level_high, uint16_t duration );
 
 
             /**
@@ -672,7 +639,7 @@ namespace epd
              * @param behavior Behavior if first pulse is high
              * @return the number of bits that were unmarshalled
              */
-            uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, UNMARSHAL_BEHAVIOR behavior =
+            virtual uint16_t _unmarshal_pulses( onewire_pulses_t& pulses, onewire_data_t& data, UNMARSHAL_BEHAVIOR behavior =
                     FAIL );
 
 
@@ -714,7 +681,6 @@ namespace epd
             uint16_t m_adaptive_fastest_read { 0 };         // From Tpdh, the fastest device, min time needed for read-slot
             uint16_t m_adaptive_slowest_write { 0 };        // (Tpdh+Tpdl)/5 -  the slowest device
             ADAPTIVE_TIMING m_adaptive_timing { NONE };     //
-            //PWR_SRC m_power { UNKNOWN };                    // Nominal power supply of devices on the bus
 
             /**
              * @brief Check bus is reset/autoreset and guard the bus
@@ -731,6 +697,6 @@ namespace epd
 
     }; // OneWireBus
 
-}// epd
+} // epd
 
 #endif /* EPD_ONEWIREBUS_H_ */

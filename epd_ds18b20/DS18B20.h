@@ -35,6 +35,8 @@
 #include "OneWireBus.h"
 #include "OneWireDevice.h"
 
+
+//TODO configure the device with write scratch
 namespace epd
 {
 
@@ -61,6 +63,19 @@ namespace epd
 
             DS18B20( onewire_rom_code_t reg, OneWireBus* bus );
 
+
+            /**
+             * @enum PWR_SPLY
+             * 
+             */
+            enum PWR_SPLY
+            {
+                UNKNOWN = 0,            //!< Device power ssupplyource unknown
+                BUS = 1,                //!< Bus powered devices only
+                PARASITIC = 2,          //!< One or more parasiticly powered devices
+            };
+
+
             /**
              * @brief DS18B20 Temperature resolutions
              * 
@@ -86,26 +101,13 @@ namespace epd
                     } eeprom;
                  };
                  
-                void copy(onewire_data_t& data)
-                {
-                    memcpy( &raw, data.data(), 9 );
-                };
+                void copy(onewire_data_t& data);
 
-                uint8_t getResolution()
-                {
-                    return eeprom.CONFIG >> 5;
-                }
+                uint8_t getResolution();
 
-                float getTemperature()
-                {
-                    printf( "getTemperature  res: %f  mult: %d  \n", RESOLUTION[ eeprom.CONFIG >> 5 ], ( eeprom.TEMP_LSB + ( 8 * eeprom.TEMP_MSB ) ));
-                    return RESOLUTION[ eeprom.CONFIG >> 5 ] * ( eeprom.TEMP_LSB + ( 256 * eeprom.TEMP_MSB ) );
-                }
+                float getTemperature();
 
-                bool isValid()
-                {
-                    return validate( raw, 9 );
-                }
+                bool isValid();
             };
 
 
@@ -191,6 +193,17 @@ namespace epd
             virtual PWR_SPLY cmdReadPowerSupply();
 
 
+            /**
+             * @brief 
+             * 
+             * @param rom_codes 
+             * @param search_start 
+             * @return true 
+             * @return false 
+             */
+            virtual bool cmdAlarmSearch( std::vector< onewire_rom_code_t >& rom_codes );
+
+
             /* --------------------------------------------------------
              *
              * Helpers
@@ -221,7 +234,6 @@ namespace epd
              * --------------------------------------------------------
              */
 
-        //protected:
             /**
              * @brief Issue a Convert T command on the given bus
              *
@@ -248,14 +260,14 @@ namespace epd
              * @param bus
              * @return
              */
-            static bool copy_scratchpad( OneWireBus* bus );
+            static bool cmd_copy_scratchpad( OneWireBus* bus );
 
             /**
              * @brief
              * @param bus
              * @return
              */
-            static bool recall_e2( OneWireBus* bus );
+            static bool cmd_recall_e2( OneWireBus* bus );
 
             /**
              * @brief Issue a Read Power Supply command on the bus and store the result
@@ -268,16 +280,21 @@ namespace epd
              */
             static PWR_SPLY cmd_read_power_supply( OneWireBus* bus );
 
-        private:
 
             /**
-             * @brief Instantiate new DHT22
-             * @param pin the GPIO pin connected to the DHT22 data line
-             * @param channel the RMT channel to use to capture data
+             * @brief Issues a Alarm Search command. Requires reset first.
+             * 
+             * Implementation of the Maxim search algorithm, using a struct for the
+             * search state initial and ending status. Searches from the given state
+             * and returns when a device, or no more devices are found.
+             *
+             * @param search_state the state to search and returning state
+             * @param autoreset Allows bus reset to bypassed
+             * @return true if the command was issued
              */
-            //DS18B20( onewire_rom_code_t reg, OneWireBus* bus );
+            virtual bool cmd_alarm_search( OneWireBus* bus, OneWireBus::onewire_search_state_t& search_state, bool autoreset = true ); 
 
-
+        private:
 
             /**
              * @brief Busses with identified DS18B20 devices, and if they are know and parasitic
@@ -289,10 +306,6 @@ namespace epd
              */
             static std::unordered_map< onewire_rom_code_t, DS18B20* > DEVICE_ROM_CODES_BUS;
 
-            /**
-             * @brief DS18B20 reg codes and their busses
-             */
-           // static std::unordered_map< DS18B20*, OneWireBus* > DEVICE_BUSSES;
 
             OneWireBus* p_bus;    // Bus this device is connected to
             //PWR_SPLY m_parasitic_power { PWR_SPLY::UNKNOWN };    // Is this device using parasitic power
